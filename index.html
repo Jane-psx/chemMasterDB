@@ -244,6 +244,7 @@
       <input type="text" id="dbSearch" placeholder="Search by name, brand, category, tag…">
       <select id="dbCategoryFilter"><option value="">All categories</option></select>
       <button class="btn secondary small" id="btnExportCSV">Export CSV</button>
+      <button class="btn secondary small" id="btnReanalyzeIncomplete">Reanalyze incomplete <span id="incompleteCount" style="opacity:.7;"></span></button>
     </div>
 
     <div class="panel" style="padding:0; overflow:auto;">
@@ -316,6 +317,13 @@
       <button class="btn" id="btnSaveEdit">Save changes</button>
       <button class="btn ghost" id="btnCancelEdit">Cancel</button>
     </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="reanalyzeModalBackdrop">
+  <div class="modal">
+    <h3>Reanalyze incomplete products</h3>
+    <div id="reanalyzeModalBody"></div>
   </div>
 </div>
 
@@ -673,6 +681,7 @@ async function analyzeProduct(){
     parsed = normalizeRecord(parsed);
     parsed = recomputeRTU(parsed);
     if(!parsed.product_id) parsed.product_id = makeId(parsed.product_name || name || 'product');
+    parsed._source_text = userContent;
     currentResult = parsed;
     renderResult(parsed);
     document.getElementById('analyzeMsg').textContent = 'Done. Review below, then save to the database.';
@@ -940,6 +949,7 @@ function renderDatabase(){
   `).join('');
   document.getElementById('dbEmptyState').style.display = filtered.length ? 'none' : 'block';
   refreshDbCount();
+  refreshIncompleteCount();
 }
 function dilutionLabel(p){
   if(p.dilution_type && /ready to use|rtu/i.test(p.dilution_type)) return 'RTU';
@@ -984,6 +994,142 @@ function downloadFile(filename, content, mime){
   a.href = URL.createObjectURL(blob); a.download = filename;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(a.href);
+}
+
+/* =========================================================
+   REANALYZE INCOMPLETE (guided gap-filling queue)
+========================================================= */
+function getMissingRTUFields(p){
+  const missing = [];
+  const priceOk = p.price!==null && p.price!==undefined && p.price!=='' && !isNaN(parseFloat(p.price));
+  if(!priceOk) missing.push({field:'price', label:'Price', hint:'e.g. "$58.00 per case" or "$2.40 per tablet"'});
+
+  if(!p.pack_size) missing.push({field:'pack_size', label:'Pack size / container size', hint:'e.g. "4 x 1 gallon" or "40 tablets, 30-40g each"'});
+
+  const isRTU = p.dilution_type && /ready to use|\brtu\b/i.test(p.dilution_type);
+  const hasDilution = isRTU || (p.minimum_dilution_percent!=null && p.maximum_dilution_percent!=null) || p.minimum_dilution_ratio;
+  if(!hasDilution) missing.push({field:'dilution', label:'Dilution ratio or percentage', hint:'e.g. "0.7%-4.0%" or "1:64" — or say if it\'s sold ready-to-use'});
+
+  return missing;
+}
+function needsReanalysis(p){
+  const noRTU = p.rtu_cost_per_gallon===null || p.rtu_cost_per_gallon===undefined || p.rtu_cost_per_gallon==='';
+  return noRTU && getMissingRTUFields(p).length>0;
+}
+function refreshIncompleteCount(){
+  const n = products.filter(needsReanalysis).length;
+  document.getElementById('incompleteCount').textContent = n ? `(${n})` : '';
+}
+
+let reanalyzeQueue = [];
+let reanalyzeIdx = 0;
+
+document.getElementById('btnReanalyzeIncomplete').addEventListener('click', ()=>{
+  reanalyzeQueue = products.filter(needsReanalysis).map(p=>p.product_id);
+  reanalyzeIdx = 0;
+  if(!reanalyzeQueue.length){
+    toast('No products are missing RTU cost data.');
+    return;
+  }
+  if(!getApiKey()){
+    toast('Add a Groq API key in Settings first.');
+    return;
+  }
+  document.getElementById('reanalyzeModalBackdrop').classList.add('show');
+  renderReanalyzeStep();
+});
+
+function renderReanalyzeStep(){
+  const body = document.getElementById('reanalyzeModalBody');
+  if(reanalyzeIdx >= reanalyzeQueue.length){
+    body.innerHTML = `<p>All caught up — no more incomplete products in this pass.</p>
+      <div class="row" style="margin-top:14px;"><button class="btn" id="btnCloseReanalyze">Done</button></div>`;
+    document.getElementById('btnCloseReanalyze').addEventListener('click', closeReanalyzeModal);
+    return;
+  }
+  const p = products.find(x=>x.product_id===reanalyzeQueue[reanalyzeIdx]);
+  if(!p){ reanalyzeIdx++; renderReanalyzeStep(); return; }
+  const missing = getMissingRTUFields(p);
+
+  body.innerHTML = `
+    <div class="hint" style="margin-bottom:10px;">Product ${reanalyzeIdx+1} of ${reanalyzeQueue.length}</div>
+    <div style="font-weight:700; font-size:15px; margin-bottom:2px;">${esc(p.product_name)||p.product_id}</div>
+    <div style="color:var(--ink-soft); font-size:12.5px; margin-bottom:12px;">${esc(p.category)||'—'} · ${esc(p.product_form)||'—'}</div>
+
+    <div class="hint" style="margin-bottom:8px;">RTU cost per gallon couldn't be calculated because the following is missing:</div>
+    <ul style="margin:0 0 14px; padding-left:18px; font-size:13px;">
+      ${missing.map(m=>`<li><strong>${esc(m.label)}</strong> — <span class="hint">${esc(m.hint)}</span></li>`).join('')}
+    </ul>
+    ${!p._source_text ? `<div class="hint" style="margin-bottom:10px;">This product was saved before source text was tracked — for best results, also re-paste the original SDS/spec text below along with the missing info.</div>` : ''}
+
+    <div class="field">
+      <label>Provide the missing information</label>
+      <textarea id="reanalyzeInput" placeholder="Paste the missing info here, e.g. Price: $58.00/case, Pack size: 4 x 1 gallon…" style="min-height:110px;"></textarea>
+    </div>
+
+    <div class="row">
+      <button class="btn" id="btnDoReanalyze">Reanalyze this product</button>
+      <button class="btn ghost" id="btnSkipReanalyze">Skip</button>
+      <div class="spacer"></div>
+      <button class="btn ghost" id="btnCloseReanalyzeMid">Close</button>
+    </div>
+    <div id="reanalyzeMsg" class="hint" style="margin-top:8px;"></div>
+  `;
+
+  document.getElementById('btnSkipReanalyze').addEventListener('click', ()=>{ reanalyzeIdx++; renderReanalyzeStep(); });
+  document.getElementById('btnCloseReanalyzeMid').addEventListener('click', closeReanalyzeModal);
+  document.getElementById('btnDoReanalyze').addEventListener('click', ()=>doReanalyze(p));
+}
+
+async function doReanalyze(p){
+  const supplied = document.getElementById('reanalyzeInput').value.trim();
+  if(!supplied){ toast('Add the missing info first, or use Skip.'); return; }
+
+  const btn = document.getElementById('btnDoReanalyze');
+  btn.disabled = true; btn.innerHTML = '<span class="loader"></span>Reanalyzing…';
+  document.getElementById('reanalyzeMsg').textContent = '';
+
+  const existingSnapshot = {};
+  SCHEMA_FIELDS.forEach(f=>{ existingSnapshot[f]=p[f]; });
+
+  let userContent = `Here is an existing partially-complete product record extracted earlier:\n${JSON.stringify(existingSnapshot)}\n\n`;
+  if(p._source_text) userContent += `Original source text used for that extraction:\n${p._source_text}\n\n`;
+  userContent += `Additional information newly supplied by the user to fill in missing fields:\n${supplied}\n\n`;
+  userContent += `Update and return the complete corrected JSON record. Keep all previously correct fields unless the new information corrects them, and recompute dilution/RTU cost fields using the newly supplied information.`;
+
+  const messages = [
+    { role:'system', content: SYSTEM_PROMPT },
+    ...FEWSHOT,
+    { role:'user', content: userContent }
+  ];
+
+  try{
+    const raw = await callGroq(messages, true);
+    let parsed = safeParseJSON(raw);
+    if(!parsed) throw new Error('Model did not return valid JSON.');
+    parsed = normalizeRecord(parsed);
+    parsed = recomputeRTU(parsed);
+    parsed.product_id = p.product_id; // keep same identity, update in place
+    parsed._source_text = p._source_text ? (p._source_text + '\n\n[Added]:\n' + supplied) : supplied;
+
+    const idx = products.findIndex(x=>x.product_id===p.product_id);
+    if(idx>=0) products[idx]=parsed; else products.push(parsed);
+    saveProducts();
+
+    toast('Updated.');
+    reanalyzeIdx++;
+    renderReanalyzeStep();
+  }catch(e){
+    document.getElementById('reanalyzeMsg').textContent = 'Failed: ' + e.message;
+    toast('Reanalysis failed: ' + e.message);
+  }finally{
+    btn.disabled = false; btn.textContent = 'Reanalyze this product';
+  }
+}
+
+function closeReanalyzeModal(){
+  document.getElementById('reanalyzeModalBackdrop').classList.remove('show');
+  renderDatabase();
 }
 
 /* =========================================================
