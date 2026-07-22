@@ -129,6 +129,12 @@
   }
   .summary-box .label{ font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; font-weight:700; margin-bottom:6px; opacity:.75;}
 
+  .calc-note{
+    background:var(--amber-soft); border:1px solid #f0d3ac; border-radius:6px; padding:12px 14px; font-size:12.5px;
+    line-height:1.6; color:var(--amber); margin-top:12px;
+  }
+  .calc-note .label{ font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; font-weight:700; margin-bottom:5px; opacity:.85;}
+
   /* ---------- Table ---------- */
   table{ width:100%; border-collapse:collapse; font-size:12.5px; table-layout:auto; }
   th{ text-align:left; padding:9px 10px; background:var(--panel-alt); color:var(--ink-faint); font-size:10.5px;
@@ -411,7 +417,10 @@ note minimum/maximum. If the product is sold ready-to-use, dilution_type should 
 percent/ratio fields should be null.
 
 RTU CALCULATIONS: if pricing is available, calculate cost per ounce/liter/gallon. If dilution data is also
-available, calculate RTU yield (liters and gallons) and RTU cost per liter/gallon at the given dilution.
+available, calculate RTU yield (liters and gallons) and RTU cost per liter/gallon at the given dilution. For
+solid-dose products (tablets, capsules, blocks) always state pack_size as both the tablet count AND the
+per-tablet weight (e.g. "40 tablets x 30-40g") when both are known — the app recomputes RTU yield/cost for
+solid-dose products client-side from tablet weight and dilution percent, so this parsing depends on it.
 
 TAGS: generate 5-20 auto tags (e.g. Delimer, Acid Based, Scale Removal, Food Service, Laundry, Warewashing,
 Kitchen, Floor Care, Tablet, RTU, Concentrate, Eco Friendly, Cost Saving Opportunity, High Hazard, Low Hazard).
@@ -751,6 +760,31 @@ function toGallons(qty, unit){
   if(gal[unit]!=null) return qty*gal[unit];
   return null;
 }
+
+/* ---- Solid-dose (tablet/capsule/block) parsing helpers ----
+   Solid-dose delimers are dosed by MASS, not volume: a tablet dissolves into a
+   quantity of water sized so the tablet's weight equals the target dilution
+   percent (w/w) of the resulting solution. This is different math from liquid
+   concentrates, which use a volume ratio — so it needs its own branch instead
+   of being forced through the gallon/liter concentrate parser. */
+function parseTabletInfo(text){
+  const t = String(text||'');
+  const countMatch = t.match(/(\d+)\s*(tablets?|tabs?|caplets?|capsules?)/i);
+  // weight range like "30-40 g" or "30-40g" (word boundary after g/kg blocks "gal" false-matches)
+  const weightRangeMatch = t.match(/(\d+(\.\d+)?)\s*-\s*(\d+(\.\d+)?)\s*(g|kg)\b/i);
+  const weightSingleMatch = !weightRangeMatch && t.match(/(\d+(\.\d+)?)\s*(g|kg)\b/i);
+  let tabletWeightGrams = null;
+  if(weightRangeMatch){
+    const mult = /kg/i.test(weightRangeMatch[5]) ? 1000 : 1;
+    tabletWeightGrams = ((parseFloat(weightRangeMatch[1]) + parseFloat(weightRangeMatch[3])) / 2) * mult;
+  }else if(weightSingleMatch){
+    const mult = /kg/i.test(weightSingleMatch[3]) ? 1000 : 1;
+    tabletWeightGrams = parseFloat(weightSingleMatch[1]) * mult;
+  }
+  const count = countMatch ? parseInt(countMatch[1], 10) : null;
+  return { count, tabletWeightGrams };
+}
+
 function recomputeRTU(rec){
   // Attempt to parse a numeric price and pack size volume; if not parseable, leave model's values.
   const priceNum = parseFloat(rec.price);
@@ -781,6 +815,52 @@ function recomputeRTU(rec){
     rec.rtu_cost_per_liter = round((priceNum/concGal)*0.264172,4);
     rec.price_per_unit = rec.price_per_unit ?? round(priceNum/concGal,3);
     return rec;
+  }
+
+  const isSolidDose = rec.product_form && /tablet|solid dose|capsule|caplet|block/i.test(rec.product_form);
+
+  // ---- Solid-dose branch: mass-based dilution math ----
+  if(!concGal && isSolidDose && hasPct){
+    const { count, tabletWeightGrams } = parseTabletInfo(`${rec.pack_size||''} ${rec.product_name||''} ${rec.brand||''}`);
+
+    if(tabletWeightGrams){
+      // Price per tablet: prefer an explicit price_per_unit that's clearly a per-tablet
+      // figure (smaller than the total price); otherwise divide case price by tablet count;
+      // otherwise fall back to treating price as already being per-tablet.
+      let pricePerTablet = null;
+      let priceBasis = '';
+      const ppu = parseFloat(rec.price_per_unit);
+      if(!isNaN(ppu) && ppu > 0 && ppu < priceNum){
+        pricePerTablet = ppu;
+        priceBasis = 'used provided price_per_unit as the per-tablet price';
+      }else if(count){
+        pricePerTablet = priceNum / count;
+        priceBasis = `divided case price by ${count} tablets`;
+      }else{
+        pricePerTablet = priceNum;
+        priceBasis = 'no tablet count found — treated stated price as already being per-tablet (unverified)';
+      }
+
+      const GRAMS_PER_GALLON = 3785; // approx. mass of 1 gallon of water, density ≈ 1 g/mL
+      const avgPct = (minPct + maxPct) / 2;
+
+      // solution mass (g) = tablet mass / dilution fraction; yield = solution mass / g-per-gallon
+      const yieldGalAtAvg = (tabletWeightGrams / (avgPct/100)) / GRAMS_PER_GALLON;
+      const yieldGalAtMinPct = (tabletWeightGrams / (minPct/100)) / GRAMS_PER_GALLON; // weakest use % -> most yield
+      const yieldGalAtMaxPct = (tabletWeightGrams / (maxPct/100)) / GRAMS_PER_GALLON; // strongest use % -> least yield
+
+      rec.rtu_yield_gallons = round(yieldGalAtAvg, 3);
+      rec.rtu_yield_liters = round(yieldGalAtAvg / 0.264172, 3);
+      rec.rtu_cost_per_gallon = round(pricePerTablet / yieldGalAtAvg, 3);
+      rec.rtu_cost_per_liter = round((pricePerTablet / yieldGalAtAvg) * 0.264172, 4);
+      rec.price_per_unit = rec.price_per_unit ?? round(pricePerTablet, 3);
+      rec._rtu_yield_range_gal = [round(yieldGalAtMaxPct,3), round(yieldGalAtMinPct,3)];
+      rec._rtu_cost_range_gal = [round(pricePerTablet/yieldGalAtMinPct,3), round(pricePerTablet/yieldGalAtMaxPct,3)];
+      rec._solid_dose_note = `Solid-dose calc: ${tabletWeightGrams.toFixed(1)}g/tablet, ${priceBasis}. `
+        + `Assumes solution density ≈ water (1 g/mL) and dilution % is w/w (tablet mass ÷ total solution mass). `
+        + `Real-world dispensers usually dose by fixed fill volume rather than exact weight-percent, so treat this as an estimate.`;
+      return rec;
+    }
   }
 
   if(hasPct && concGal){
@@ -843,6 +923,8 @@ function renderResult(rec){
       </div>
 
       ${rec._rtu_cost_range_gal ? `<div class="hint" style="margin-top:8px;">Across the stated dilution range, RTU cost spans approximately $${rec._rtu_cost_range_gal[0]} – $${rec._rtu_cost_range_gal[1]} per gallon.</div>` : ''}
+
+      ${rec._solid_dose_note ? `<div class="calc-note"><div class="label">Solid-dose calculation basis</div>${esc(rec._solid_dose_note)}</div>` : ''}
 
       <div class="summary-box">
         <div class="label">AI Summary</div>
