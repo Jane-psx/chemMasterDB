@@ -64,7 +64,7 @@
   nav.tabs button.active{ color:var(--teal-deep); border-bottom-color:var(--teal); }
   nav.tabs button:hover{ color:var(--teal-deep); }
 
-  main{ max-width:1180px; margin:0 auto; padding:24px; }
+  main{ max-width:1600px; width:95%; margin:0 auto; padding:24px; }
   .view{ display:none; } .view.active{ display:block; }
 
   h2.section-title{ font-size:16px; margin:0 0 4px; font-weight:650; }
@@ -130,12 +130,14 @@
   .summary-box .label{ font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; font-weight:700; margin-bottom:6px; opacity:.75;}
 
   /* ---------- Table ---------- */
-  table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  table{ width:100%; border-collapse:collapse; font-size:12.5px; table-layout:auto; }
   th{ text-align:left; padding:9px 10px; background:var(--panel-alt); color:var(--ink-faint); font-size:10.5px;
-      text-transform:uppercase; letter-spacing:.4px; border-bottom:1px solid var(--border); position:sticky; top:49px; }
+      text-transform:uppercase; letter-spacing:.4px; border-bottom:1px solid var(--border); }
   td{ padding:9px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
   tr:hover td{ background:var(--panel-alt); }
   td.mono{ font-family:var(--mono); }
+  th:last-child, td:last-child{ white-space:nowrap; }
+  td:last-child .btn{ margin-bottom:4px; }
   .empty-state{ text-align:center; padding:60px 20px; color:var(--ink-faint); }
   .empty-state .big{ font-size:32px; margin-bottom:8px; }
 
@@ -928,9 +930,11 @@ function renderDatabase(){
       <td class="mono">${p.rtu_cost_per_gallon!=null?'$'+parseFloat(p.rtu_cost_per_gallon).toFixed(3):'—'}</td>
       <td>${confBadge(p.confidence_score)}</td>
       <td>
-        <button class="btn ghost small" onclick="viewProduct('${p.product_id}')">View</button>
-        <button class="btn ghost small" onclick="editProductById('${p.product_id}')">Edit</button>
-        <button class="btn danger small" onclick="deleteProduct('${p.product_id}')">Delete</button>
+        <div class="row" style="gap:5px; flex-wrap:nowrap;">
+          <button class="btn ghost small" onclick="viewProduct('${p.product_id}')">View</button>
+          <button class="btn ghost small" onclick="editProductById('${p.product_id}')">Edit</button>
+          <button class="btn danger small" onclick="deleteProduct('${p.product_id}')">Delete</button>
+        </div>
       </td>
     </tr>
   `).join('');
