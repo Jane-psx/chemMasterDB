@@ -218,6 +218,11 @@
             <textarea id="inPricing" placeholder="e.g. Price: $42.50/case, Pack size: 4 x 1 gallon, Vendor: Prime Source GPO, Contract #…" style="min-height:120px;"></textarea>
           </div>
           <div class="field">
+            <label>Sourced from (optional)</label>
+            <input type="text" id="inSourcedFrom" placeholder="e.g. Prime Source GPO, WellLink, HPSI, Direct from manufacturer">
+            <div class="hint">The specific catalogue/GPO/channel this pricing came from — used to compare the same product across sources in Compare &amp; Match.</div>
+          </div>
+          <div class="field">
             <label>User notes (optional)</label>
             <textarea id="inNotes" placeholder="Any additional context, category hints, or comparison targets…" style="min-height:80px;"></textarea>
           </div>
@@ -241,17 +246,19 @@
     <p class="section-desc">All saved product records. Search, filter, edit, or export.</p>
 
     <div class="search-bar">
-      <input type="text" id="dbSearch" placeholder="Search by name, brand, category, tag…">
+      <input type="text" id="dbSearch" placeholder="Search by name, brand, category, tag, source…">
       <select id="dbCategoryFilter"><option value="">All categories</option></select>
       <button class="btn secondary small" id="btnExportCSV">Export CSV</button>
-      <button class="btn secondary small" id="btnReanalyzeIncomplete">Reanalyze incomplete <span id="incompleteCount" style="opacity:.7;"></span></button>
+      <button class="btn ghost small" id="btnSelectIncomplete">Select incomplete <span id="incompleteCount" style="opacity:.7;"></span></button>
+      <button class="btn secondary small" id="btnReanalyzeSelected" disabled>Reanalyze selected</button>
     </div>
 
     <div class="panel" style="padding:0; overflow:auto;">
       <table id="dbTable">
         <thead>
           <tr>
-            <th>Product</th><th>Category</th><th>Form</th><th>Dilution</th><th>RTU $/gal</th><th>Confidence</th><th></th>
+            <th style="width:30px;"><input type="checkbox" id="selectAllCheckbox"></th>
+            <th>Product</th><th>Category</th><th>Form</th><th>Dilution</th><th>RTU $/gal</th><th>Source</th><th>Confidence</th><th></th>
           </tr>
         </thead>
         <tbody id="dbTableBody"></tbody>
@@ -363,7 +370,7 @@ const SCHEMA_FIELDS = ["product_id","product_name","brand","manufacturer","categ
   "minimum_dilution_percent","maximum_dilution_percent","minimum_dilution_ratio","maximum_dilution_ratio",
   "rtu_yield_liters","rtu_yield_gallons","pack_size","uom","price","price_per_unit","rtu_cost_per_liter",
   "rtu_cost_per_gallon","hazard_classification","ppe_required","green_certifications","epa_registered",
-  "contract_vendor","supplier","tags","comparable_categories","comparable_products","match_keywords",
+  "contract_vendor","supplier","sourced_from","tags","comparable_categories","comparable_products","match_keywords",
   "confidence_score","ai_summary"];
 
 /* =========================================================
@@ -380,8 +387,14 @@ product_id, product_name, brand, manufacturer, category, subcategory, product_fo
 application (array), recommended_use, restrictions_on_use, dilution_type, minimum_dilution_percent,
 maximum_dilution_percent, minimum_dilution_ratio, maximum_dilution_ratio, rtu_yield_liters, rtu_yield_gallons,
 pack_size, uom, price, price_per_unit, rtu_cost_per_liter, rtu_cost_per_gallon, hazard_classification,
-ppe_required (array), green_certifications (array), epa_registered, contract_vendor, supplier, tags (array),
-comparable_categories (array), comparable_products (array), match_keywords (array), confidence_score, ai_summary.
+ppe_required (array), green_certifications (array), epa_registered, contract_vendor, supplier, sourced_from,
+tags (array), comparable_categories (array), comparable_products (array), match_keywords (array),
+confidence_score, ai_summary.
+
+SOURCED FROM: the specific GPO, catalogue, contract, or channel this exact pricing came from (e.g. "Prime Source GPO",
+"WellLink", "HPSI", "Entegra", "Provista", "Medtrust", "Direct from manufacturer"). This is distinct from
+contract_vendor/supplier and exists specifically so the same or comparable product priced through different
+sourcing channels can be compared for cost-savings analysis. If not stated, use null rather than guessing.
 
 CATEGORY: classify every product (e.g. Delimer, Degreaser, Dishmachine Detergent, Glass Cleaner, Floor Cleaner,
 Disinfectant, Laundry Detergent, Rinse Aid, Sanitizer, Scale Remover, Coffee Equipment Cleaner, All Purpose Cleaner,
@@ -457,6 +470,7 @@ Pricing info: Pack size 4/1gl, case price $58.00. Supplier: Prime Source GPO.` }
     epa_registered: null,
     contract_vendor: "Prime Source GPO",
     supplier: "Prime Source GPO",
+    sourced_from: "Prime Source GPO",
     tags: ["Delimer","RTU","Scale Removal","Food Service","Liquid","Warewashing"],
     comparable_categories: ["Delimer","Scale Remover"],
     comparable_products: ["Monogram Clean Force Delimer","Scale Kleen"],
@@ -503,6 +517,7 @@ Pricing info: 40 tablets per case, case price $96.00. Supplier: Prime Source GPO
     epa_registered: null,
     contract_vendor: "Prime Source GPO",
     supplier: "Prime Source GPO",
+    sourced_from: "Prime Source GPO",
     tags: ["Delimer","Acid Based","Scale Removal","Tablet","Solid Dose","Warewashing","Cost Saving Opportunity"],
     comparable_categories: ["Delimer","Scale Remover"],
     comparable_products: ["Lime-A-Way","Scale Kleen"],
@@ -638,6 +653,7 @@ document.getElementById('btnClearInputs').addEventListener('click', ()=>{
   document.getElementById('inName').value='';
   document.getElementById('inSDS').value='';
   document.getElementById('inPricing').value='';
+  document.getElementById('inSourcedFrom').value='';
   document.getElementById('inNotes').value='';
 });
 
@@ -647,6 +663,7 @@ async function analyzeProduct(){
   const name = document.getElementById('inName').value.trim();
   const sds = document.getElementById('inSDS').value.trim();
   const pricing = document.getElementById('inPricing').value.trim();
+  const sourcedFrom = document.getElementById('inSourcedFrom').value.trim();
   const notes = document.getElementById('inNotes').value.trim();
 
   if(!sds && !pricing && !notes){
@@ -666,6 +683,7 @@ async function analyzeProduct(){
   if(name) userContent += `Product name (as given by user): ${name}\n\n`;
   if(sds) userContent += `SDS / Specification / Manufacturer text:\n${sds}\n\n`;
   if(pricing) userContent += `Pricing / supplier / contract info:\n${pricing}\n\n`;
+  if(sourcedFrom) userContent += `Sourced from (as given by user): ${sourcedFrom}\n\n`;
   if(notes) userContent += `User notes:\n${notes}\n\n`;
 
   const messages = [
@@ -679,6 +697,8 @@ async function analyzeProduct(){
     let parsed = safeParseJSON(raw);
     if(!parsed) throw new Error('Model did not return valid JSON.');
     parsed = normalizeRecord(parsed);
+    if(name) parsed.product_name = name; // user-supplied name is authoritative — never let the model rename it
+    if(sourcedFrom) parsed.sourced_from = sourcedFrom; // user-supplied source is authoritative for savings comparisons
     parsed = recomputeRTU(parsed);
     if(!parsed.product_id) parsed.product_id = makeId(parsed.product_name || name || 'product');
     parsed._source_text = userContent;
@@ -819,6 +839,7 @@ function renderResult(rec){
         ${kv('RTU cost / L', fmtMoney(rec.rtu_cost_per_liter))}
         ${kv('Contract vendor', rec.contract_vendor)}
         ${kv('Supplier', rec.supplier)}
+        ${kv('Sourced from', rec.sourced_from)}
       </div>
 
       ${rec._rtu_cost_range_gal ? `<div class="hint" style="margin-top:8px;">Across the stated dilution range, RTU cost spans approximately $${rec._rtu_cost_range_gal[0]} – $${rec._rtu_cost_range_gal[1]} per gallon.</div>` : ''}
@@ -912,6 +933,9 @@ document.getElementById('btnSaveEdit').addEventListener('click', ()=>{
 document.getElementById('dbSearch').addEventListener('input', renderDatabase);
 document.getElementById('dbCategoryFilter').addEventListener('change', renderDatabase);
 
+let selectedProductIds = new Set();
+let lastFilteredIds = [];
+
 function renderDatabase(){
   const q = document.getElementById('dbSearch').value.trim().toLowerCase();
   const catFilter = document.getElementById('dbCategoryFilter').value;
@@ -925,18 +949,21 @@ function renderDatabase(){
   const filtered = products.filter(p=>{
     if(catFilter && p.category!==catFilter) return false;
     if(!q) return true;
-    const hay = [p.product_name,p.brand,p.category,p.subcategory,...(p.tags||[])].join(' ').toLowerCase();
+    const hay = [p.product_name,p.brand,p.category,p.subcategory,p.sourced_from,p.contract_vendor,p.supplier,...(p.tags||[])].join(' ').toLowerCase();
     return hay.includes(q);
   });
+  lastFilteredIds = filtered.map(p=>p.product_id);
 
   const tbody = document.getElementById('dbTableBody');
   tbody.innerHTML = filtered.map(p=>`
     <tr>
+      <td><input type="checkbox" class="row-select" data-id="${esc(p.product_id)}" ${selectedProductIds.has(p.product_id)?'checked':''} onchange="toggleRowSelect('${esc(p.product_id)}', this.checked)"></td>
       <td><strong>${esc(p.product_name)||'—'}</strong><br><span style="color:var(--ink-faint); font-size:11.5px;">${esc(p.brand)||''}</span></td>
       <td>${esc(p.category)||'—'}${p.subcategory?`<br><span style="color:var(--ink-faint); font-size:11.5px;">${esc(p.subcategory)}</span>`:''}</td>
       <td>${esc(p.product_form)||'—'}</td>
       <td class="mono">${dilutionLabel(p)}</td>
       <td class="mono">${p.rtu_cost_per_gallon!=null?'$'+parseFloat(p.rtu_cost_per_gallon).toFixed(3):'—'}</td>
+      <td>${p.sourced_from?pill(p.sourced_from,'grey'):'<span style="color:var(--ink-faint);">—</span>'}</td>
       <td>${confBadge(p.confidence_score)}</td>
       <td>
         <div class="row" style="gap:5px; flex-wrap:nowrap;">
@@ -950,6 +977,30 @@ function renderDatabase(){
   document.getElementById('dbEmptyState').style.display = filtered.length ? 'none' : 'block';
   refreshDbCount();
   refreshIncompleteCount();
+  updateSelectionUI();
+
+  const selectAll = document.getElementById('selectAllCheckbox');
+  selectAll.checked = filtered.length>0 && filtered.every(p=>selectedProductIds.has(p.product_id));
+}
+
+window.toggleRowSelect = function(id, checked){
+  if(checked) selectedProductIds.add(id); else selectedProductIds.delete(id);
+  updateSelectionUI();
+  const selectAll = document.getElementById('selectAllCheckbox');
+  selectAll.checked = lastFilteredIds.length>0 && lastFilteredIds.every(pid=>selectedProductIds.has(pid));
+};
+
+document.getElementById('selectAllCheckbox').addEventListener('change', (e)=>{
+  if(e.target.checked) lastFilteredIds.forEach(id=>selectedProductIds.add(id));
+  else lastFilteredIds.forEach(id=>selectedProductIds.delete(id));
+  renderDatabase();
+});
+
+function updateSelectionUI(){
+  const n = selectedProductIds.size;
+  const btn = document.getElementById('btnReanalyzeSelected');
+  btn.textContent = n ? `Reanalyze selected (${n})` : 'Reanalyze selected';
+  btn.disabled = n===0;
 }
 function dilutionLabel(p){
   if(p.dilution_type && /ready to use|rtu/i.test(p.dilution_type)) return 'RTU';
@@ -979,7 +1030,7 @@ document.getElementById('btnExportCSV').addEventListener('click', ()=>{
   if(!products.length){ toast('No products to export.'); return; }
   const cols = ['product_id','product_name','brand','manufacturer','category','subcategory','product_form',
     'chemical_type','dilution_type','minimum_dilution_percent','maximum_dilution_percent','pack_size','price',
-    'rtu_cost_per_gallon','rtu_cost_per_liter','contract_vendor','supplier','confidence_score'];
+    'rtu_cost_per_gallon','rtu_cost_per_liter','contract_vendor','supplier','sourced_from','confidence_score'];
   const rows = [cols.join(',')].concat(products.map(p=>cols.map(c=>csvCell(p[c])).join(',')));
   downloadFile('chem-intel-products.csv', rows.join('\n'), 'text/csv');
 });
@@ -1024,17 +1075,19 @@ function refreshIncompleteCount(){
 let reanalyzeQueue = [];
 let reanalyzeIdx = 0;
 
-document.getElementById('btnReanalyzeIncomplete').addEventListener('click', ()=>{
-  reanalyzeQueue = products.filter(needsReanalysis).map(p=>p.product_id);
+document.getElementById('btnSelectIncomplete').addEventListener('click', ()=>{
+  const incomplete = products.filter(needsReanalysis);
+  if(!incomplete.length){ toast('No products are missing RTU cost data.'); return; }
+  incomplete.forEach(p=>selectedProductIds.add(p.product_id));
+  renderDatabase();
+  toast(`Selected ${incomplete.length} incomplete product(s). Click "Reanalyze selected" to work through them.`);
+});
+
+document.getElementById('btnReanalyzeSelected').addEventListener('click', ()=>{
+  if(!selectedProductIds.size){ toast('Select at least one product first.'); return; }
+  if(!getApiKey()){ toast('Add a Groq API key in Settings first.'); return; }
+  reanalyzeQueue = [...selectedProductIds];
   reanalyzeIdx = 0;
-  if(!reanalyzeQueue.length){
-    toast('No products are missing RTU cost data.');
-    return;
-  }
-  if(!getApiKey()){
-    toast('Add a Groq API key in Settings first.');
-    return;
-  }
   document.getElementById('reanalyzeModalBackdrop').classList.add('show');
   renderReanalyzeStep();
 });
@@ -1042,8 +1095,8 @@ document.getElementById('btnReanalyzeIncomplete').addEventListener('click', ()=>
 function renderReanalyzeStep(){
   const body = document.getElementById('reanalyzeModalBody');
   if(reanalyzeIdx >= reanalyzeQueue.length){
-    body.innerHTML = `<p>All caught up — no more incomplete products in this pass.</p>
-      <div class="row" style="margin-top:14px;"><button class="btn" id="btnCloseReanalyze">Done</button></div>`;
+    body.innerHTML = `<p>Done working through the selected product(s).</p>
+      <div class="row" style="margin-top:14px;"><button class="btn" id="btnCloseReanalyze">Close</button></div>`;
     document.getElementById('btnCloseReanalyze').addEventListener('click', closeReanalyzeModal);
     return;
   }
@@ -1056,16 +1109,23 @@ function renderReanalyzeStep(){
     <div style="font-weight:700; font-size:15px; margin-bottom:2px;">${esc(p.product_name)||p.product_id}</div>
     <div style="color:var(--ink-soft); font-size:12.5px; margin-bottom:12px;">${esc(p.category)||'—'} · ${esc(p.product_form)||'—'}</div>
 
-    <div class="hint" style="margin-bottom:8px;">RTU cost per gallon couldn't be calculated because the following is missing:</div>
-    <ul style="margin:0 0 14px; padding-left:18px; font-size:13px;">
-      ${missing.map(m=>`<li><strong>${esc(m.label)}</strong> — <span class="hint">${esc(m.hint)}</span></li>`).join('')}
-    </ul>
-    ${!p._source_text ? `<div class="hint" style="margin-bottom:10px;">This product was saved before source text was tracked — for best results, also re-paste the original SDS/spec text below along with the missing info.</div>` : ''}
+    ${missing.length ? `
+      <div class="hint" style="margin-bottom:8px;">RTU cost per gallon couldn't be calculated because the following is missing:</div>
+      <ul style="margin:0 0 14px; padding-left:18px; font-size:13px;">
+        ${missing.map(m=>`<li><strong>${esc(m.label)}</strong> — <span class="hint">${esc(m.hint)}</span></li>`).join('')}
+      </ul>
+    ` : `<div class="hint" style="margin-bottom:14px;">Key RTU fields are already present — use this to add or correct any information (updated pricing, a new source, corrected dilution, etc).</div>`}
+    ${!p._source_text ? `<div class="hint" style="margin-bottom:10px;">This product was saved before source text was tracked — for best results, also re-paste the original SDS/spec text below along with any updated info.</div>` : ''}
 
     <div class="field">
-      <label>Provide the missing information</label>
-      <textarea id="reanalyzeInput" placeholder="Paste the missing info here, e.g. Price: $58.00/case, Pack size: 4 x 1 gallon…" style="min-height:110px;"></textarea>
+      <label>Sourced from (optional — updates this field)</label>
+      <input type="text" id="reanalyzeSourcedFrom" value="${esc(p.sourced_from||'')}" placeholder="e.g. Prime Source GPO, WellLink, HPSI">
     </div>
+    <div class="field">
+      <label>Provide the new / missing information</label>
+      <textarea id="reanalyzeInput" placeholder="Paste the missing or updated info here, e.g. Price: $58.00/case, Pack size: 4 x 1 gallon…" style="min-height:110px;"></textarea>
+    </div>
+    <div class="hint" style="margin-bottom:10px;">The product name (<strong>${esc(p.product_name)}</strong>) is locked and won't be changed by reanalysis.</div>
 
     <div class="row">
       <button class="btn" id="btnDoReanalyze">Reanalyze this product</button>
@@ -1083,7 +1143,8 @@ function renderReanalyzeStep(){
 
 async function doReanalyze(p){
   const supplied = document.getElementById('reanalyzeInput').value.trim();
-  if(!supplied){ toast('Add the missing info first, or use Skip.'); return; }
+  const sourcedFromInput = document.getElementById('reanalyzeSourcedFrom').value.trim();
+  if(!supplied && !sourcedFromInput){ toast('Add updated info (or a source) first, or use Skip.'); return; }
 
   const btn = document.getElementById('btnDoReanalyze');
   btn.disabled = true; btn.innerHTML = '<span class="loader"></span>Reanalyzing…';
@@ -1094,8 +1155,9 @@ async function doReanalyze(p){
 
   let userContent = `Here is an existing partially-complete product record extracted earlier:\n${JSON.stringify(existingSnapshot)}\n\n`;
   if(p._source_text) userContent += `Original source text used for that extraction:\n${p._source_text}\n\n`;
-  userContent += `Additional information newly supplied by the user to fill in missing fields:\n${supplied}\n\n`;
-  userContent += `Update and return the complete corrected JSON record. Keep all previously correct fields unless the new information corrects them, and recompute dilution/RTU cost fields using the newly supplied information.`;
+  if(supplied) userContent += `Additional information newly supplied by the user to fill in missing or updated fields:\n${supplied}\n\n`;
+  if(sourcedFromInput) userContent += `Sourced from (as given by user): ${sourcedFromInput}\n\n`;
+  userContent += `The product name must remain exactly "${p.product_name}" — do not change it. Update and return the complete corrected JSON record. Keep all previously correct fields unless the new information corrects them, and recompute dilution/RTU cost fields using the newly supplied information.`;
 
   const messages = [
     { role:'system', content: SYSTEM_PROMPT },
@@ -1108,9 +1170,12 @@ async function doReanalyze(p){
     let parsed = safeParseJSON(raw);
     if(!parsed) throw new Error('Model did not return valid JSON.');
     parsed = normalizeRecord(parsed);
+    parsed.product_name = p.product_name; // locked — never altered by reanalysis
+    if(sourcedFromInput) parsed.sourced_from = sourcedFromInput;
+    else if(parsed.sourced_from==null) parsed.sourced_from = p.sourced_from;
     parsed = recomputeRTU(parsed);
     parsed.product_id = p.product_id; // keep same identity, update in place
-    parsed._source_text = p._source_text ? (p._source_text + '\n\n[Added]:\n' + supplied) : supplied;
+    parsed._source_text = supplied ? (p._source_text ? (p._source_text + '\n\n[Added]:\n' + supplied) : supplied) : (p._source_text || '');
 
     const idx = products.findIndex(x=>x.product_id===p.product_id);
     if(idx>=0) products[idx]=parsed; else products.push(parsed);
@@ -1148,15 +1213,29 @@ document.getElementById('compareSelect').addEventListener('change', (e)=>{
   const scored = products.filter(p=>p.product_id!==id).map(p=>({p, score: matchScore(target,p)}))
     .sort((a,b)=>b.score.total-a.score.total);
 
+  const targetPanel = `
+    <div class="panel" style="margin-top:18px; background:var(--panel-alt);">
+      <div style="font-weight:700; font-size:14px;">${esc(target.product_name)||target.product_id}</div>
+      <div class="hint" style="margin-top:2px;">
+        ${target.sourced_from?`Sourced from: <strong>${esc(target.sourced_from)}</strong> · `:''}
+        RTU cost/gal: <strong>${target.rtu_cost_per_gallon!=null?'$'+parseFloat(target.rtu_cost_per_gallon).toFixed(3):'—'}</strong>
+      </div>
+    </div>`;
+
   if(!scored.length){
-    wrap.innerHTML = `<div class="empty-state"><div class="big">🔎</div>Add more products to the database to see matches.</div>`;
+    wrap.innerHTML = targetPanel + `<div class="empty-state"><div class="big">🔎</div>Add more products to the database to see matches.</div>`;
     return;
   }
-  wrap.innerHTML = `<div style="margin-top:18px;">` + scored.map(({p,score})=>`
+  wrap.innerHTML = targetPanel + `<div style="margin-top:14px;">` + scored.map(({p,score})=>`
     <div class="match-item">
       <div class="info">
         <div class="name">${esc(p.product_name)||p.product_id}</div>
         <div class="cat">${esc(p.category)||'—'} · ${esc(p.product_form)||'—'} · ${esc(p.brand)||'—'}</div>
+        <div class="hint" style="margin-top:4px;">
+          ${p.sourced_from?`Sourced from: <strong>${esc(p.sourced_from)}</strong> · `:''}
+          RTU cost/gal: <strong>${p.rtu_cost_per_gallon!=null?'$'+parseFloat(p.rtu_cost_per_gallon).toFixed(3):'—'}</strong>
+        </div>
+        ${savingsBadge(target,p)}
       </div>
       <div class="match-score">
         <div class="num">${score.total}%</div>
@@ -1165,6 +1244,18 @@ document.getElementById('compareSelect').addEventListener('change', (e)=>{
     </div>
   `).join('') + `</div>`;
 });
+
+function savingsBadge(target, match){
+  const a = parseFloat(target.rtu_cost_per_gallon), b = parseFloat(match.rtu_cost_per_gallon);
+  if(isNaN(a) || isNaN(b) || a<=0 || b<=0) return '';
+  if(Math.abs(a-b) < 0.0005) return `<div style="margin-top:5px;"><span class="pill grey">Same RTU cost per gallon</span></div>`;
+  const targetCheaper = a < b;
+  const diffPct = (Math.abs(a-b) / Math.max(a,b) * 100);
+  const cheaperLabel = targetCheaper
+    ? (target.sourced_from ? esc(target.sourced_from) : 'this product')
+    : (match.sourced_from ? esc(match.sourced_from) : (esc(match.product_name)||'this match'));
+  return `<div style="margin-top:5px;"><span class="pill green">${diffPct.toFixed(0)}% cheaper via ${cheaperLabel} ($${Math.abs(a-b).toFixed(3)}/gal difference)</span></div>`;
+}
 
 function matchScore(a,b){
   let score = 0;
