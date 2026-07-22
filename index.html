@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chemical Product Intelligence Engine</title>
+<style>
+  :root{
+    --bg: #eef2f1;
+    --panel: #ffffff;
+    --panel-alt: #f4f7f6;
+    --border: #d7e0dd;
+    --ink: #1c2b28;
+    --ink-soft: #52645f;
+    --ink-faint: #8a9a95;
+    --teal: #0f6e63;
+    --teal-deep: #0a4f47;
+    --teal-soft: #e3f0ee;
+    --amber: #b5590f;
+    --amber-soft: #fbe9d8;
+    --red: #a13030;
+    --red-soft: #f6dede;
+    --green: #2f7d4f;
+    --green-soft: #e0f0e5;
+    --mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+    --radius: 8px;
+    --shadow: 0 1px 2px rgba(20,40,36,.06), 0 4px 14px rgba(20,40,36,.05);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:var(--sans); background:var(--bg); color:var(--ink);
+    font-size:14px; line-height:1.5;
+  }
+  ::selection{ background: var(--teal-soft); }
+
+  /* ---------- Header ---------- */
+  header{
+    background: linear-gradient(135deg, var(--teal-deep), var(--teal));
+    color:#fff; padding:18px 28px; display:flex; align-items:center; justify-content:space-between;
+    box-shadow: var(--shadow);
+  }
+  header .brand{ display:flex; align-items:center; gap:12px; }
+  header .brand .mark{
+    width:34px; height:34px; border-radius:9px; background:rgba(255,255,255,.15);
+    display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-weight:700; font-size:15px;
+    border:1px solid rgba(255,255,255,.25);
+  }
+  header h1{ font-size:16px; margin:0; font-weight:650; letter-spacing:.2px; }
+  header .sub{ font-size:11.5px; opacity:.8; margin-top:1px; font-family:var(--mono); letter-spacing:.3px; }
+  header .status{ font-size:12px; display:flex; align-items:center; gap:8px; opacity:.9; }
+  .dot{ width:7px; height:7px; border-radius:50%; background:#f0ad4e; }
+  .dot.ok{ background:#5ecb8d; }
+
+  /* ---------- Tabs ---------- */
+  nav.tabs{
+    display:flex; gap:2px; padding:0 24px; background:var(--panel); border-bottom:1px solid var(--border);
+    position:sticky; top:0; z-index:10;
+  }
+  nav.tabs button{
+    background:none; border:none; padding:13px 16px; font-size:13px; font-weight:600; color:var(--ink-soft);
+    cursor:pointer; border-bottom:2px solid transparent; font-family:var(--sans);
+  }
+  nav.tabs button.active{ color:var(--teal-deep); border-bottom-color:var(--teal); }
+  nav.tabs button:hover{ color:var(--teal-deep); }
+
+  main{ max-width:1180px; margin:0 auto; padding:24px; }
+  .view{ display:none; } .view.active{ display:block; }
+
+  h2.section-title{ font-size:16px; margin:0 0 4px; font-weight:650; }
+  p.section-desc{ margin:0 0 18px; color:var(--ink-soft); font-size:13px; }
+
+  .panel{
+    background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+    padding:18px; box-shadow:var(--shadow);
+  }
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:880px){ .grid2{ grid-template-columns:1fr; } }
+
+  label{ display:block; font-size:11.5px; font-weight:650; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-faint); margin-bottom:5px; }
+  textarea, input[type=text], input[type=password], input[type=number], select{
+    width:100%; border:1px solid var(--border); border-radius:6px; padding:9px 10px; font-family:var(--sans);
+    font-size:13px; color:var(--ink); background:#fff;
+  }
+  textarea{ font-family:var(--mono); font-size:12.5px; resize:vertical; min-height:110px; }
+  textarea:focus, input:focus, select:focus{ outline:none; border-color:var(--teal); box-shadow:0 0 0 3px var(--teal-soft); }
+  .field{ margin-bottom:14px; }
+
+  button.btn{
+    background:var(--teal); color:#fff; border:none; padding:10px 18px; border-radius:6px; font-size:13px;
+    font-weight:650; cursor:pointer; font-family:var(--sans);
+  }
+  button.btn:hover{ background:var(--teal-deep); }
+  button.btn:disabled{ background:#a9c0bc; cursor:not-allowed; }
+  button.btn.secondary{ background:#fff; color:var(--teal-deep); border:1px solid var(--teal); }
+  button.btn.secondary:hover{ background:var(--teal-soft); }
+  button.btn.ghost{ background:none; color:var(--ink-soft); border:1px solid var(--border); }
+  button.btn.ghost:hover{ background:var(--panel-alt); }
+  button.btn.danger{ background:none; color:var(--red); border:1px solid var(--red-soft); }
+  button.btn.danger:hover{ background:var(--red-soft); }
+  button.btn.small{ padding:6px 11px; font-size:12px; }
+
+  .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .spacer{ flex:1; }
+
+  /* ---------- Result card ---------- */
+  .field-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px 16px; }
+  @media (max-width:880px){ .field-grid{ grid-template-columns:1fr 1fr; } }
+  .kv{ padding:9px 10px; background:var(--panel-alt); border-radius:6px; border:1px solid var(--border); }
+  .kv .k{ font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-faint); font-weight:650; margin-bottom:2px; }
+  .kv .v{ font-size:13px; font-weight:600; font-family:var(--mono); word-break:break-word; }
+  .kv .v.empty{ color:var(--ink-faint); font-weight:400; font-style:italic; }
+
+  .pill{ display:inline-block; padding:2px 9px; border-radius:99px; font-size:11px; font-weight:650; margin:2px 3px 0 0; }
+  .pill.teal{ background:var(--teal-soft); color:var(--teal-deep); }
+  .pill.amber{ background:var(--amber-soft); color:var(--amber); }
+  .pill.red{ background:var(--red-soft); color:var(--red); }
+  .pill.green{ background:var(--green-soft); color:var(--green); }
+  .pill.grey{ background:var(--panel-alt); color:var(--ink-soft); border:1px solid var(--border); }
+
+  .conf-bar{ height:5px; border-radius:99px; background:var(--border); overflow:hidden; width:100px; }
+  .conf-bar > div{ height:100%; background:var(--teal); }
+
+  .dilution-gauge{ height:8px; border-radius:99px; background:linear-gradient(90deg, var(--teal-soft), var(--teal)); position:relative; margin-top:6px;}
+
+  .summary-box{
+    background:var(--teal-soft); border:1px solid #c6e2dc; border-radius:6px; padding:14px 16px; font-size:13px;
+    line-height:1.6; color:var(--teal-deep); margin-top:16px;
+  }
+  .summary-box .label{ font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; font-weight:700; margin-bottom:6px; opacity:.75;}
+
+  /* ---------- Table ---------- */
+  table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  th{ text-align:left; padding:9px 10px; background:var(--panel-alt); color:var(--ink-faint); font-size:10.5px;
+      text-transform:uppercase; letter-spacing:.4px; border-bottom:1px solid var(--border); position:sticky; top:49px; }
+  td{ padding:9px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+  tr:hover td{ background:var(--panel-alt); }
+  td.mono{ font-family:var(--mono); }
+  .empty-state{ text-align:center; padding:60px 20px; color:var(--ink-faint); }
+  .empty-state .big{ font-size:32px; margin-bottom:8px; }
+
+  /* ---------- Compare ---------- */
+  .match-item{ display:flex; align-items:center; gap:12px; padding:12px; border:1px solid var(--border); border-radius:6px; margin-bottom:8px; background:#fff; }
+  .match-item .info{ flex:1; }
+  .match-item .name{ font-weight:650; font-size:13px; }
+  .match-item .cat{ font-size:11.5px; color:var(--ink-soft); }
+  .match-score{ text-align:right; min-width:76px; }
+  .match-score .num{ font-family:var(--mono); font-weight:700; font-size:15px; }
+
+  /* ---------- Toast ---------- */
+  #toast{ position:fixed; bottom:22px; right:22px; background:var(--ink); color:#fff; padding:11px 18px; border-radius:7px;
+          font-size:13px; box-shadow:var(--shadow); opacity:0; transform:translateY(8px); transition:.25s; pointer-events:none; z-index:100;}
+  #toast.show{ opacity:1; transform:translateY(0); }
+
+  .hint{ font-size:11.5px; color:var(--ink-faint); margin-top:4px; }
+  .link-btn{ background:none; border:none; color:var(--teal); cursor:pointer; font-size:12.5px; font-weight:600; padding:0; }
+  .search-bar{ display:flex; gap:10px; margin-bottom:14px; }
+  .search-bar input{ flex:1; }
+  .search-bar select{ max-width:200px; }
+
+  .modal-backdrop{ position:fixed; inset:0; background:rgba(20,30,28,.45); display:none; align-items:center; justify-content:center; z-index:50; padding:20px; }
+  .modal-backdrop.show{ display:flex; }
+  .modal{ background:#fff; border-radius:10px; max-width:640px; width:100%; max-height:86vh; overflow:auto; padding:22px; box-shadow:0 20px 60px rgba(0,0,0,.25); }
+  .modal h3{ margin-top:0; }
+
+  code.inline{ background:var(--panel-alt); padding:1px 6px; border-radius:4px; font-family:var(--mono); font-size:12px; }
+  .loader{ display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; vertical-align:-2px; margin-right:7px;}
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="mark">CPI</div>
+    <div>
+      <h1>Chemical Product Intelligence Engine</h1>
+      <div class="sub">Procurement &amp; dilution intelligence database</div>
+    </div>
+  </div>
+  <div class="status">
+    <span class="dot" id="keyDot"></span>
+    <span id="keyStatusText">API key not set</span>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-view="analyze">Analyze Product</button>
+  <button class="tab-btn" data-view="database">Database <span id="dbCount" style="opacity:.6;font-weight:500;"></span></button>
+  <button class="tab-btn" data-view="compare">Compare &amp; Match</button>
+  <button class="tab-btn" data-view="settings">Settings</button>
+</nav>
+
+<main>
+
+  <!-- ================= ANALYZE ================= -->
+  <div class="view active" id="view-analyze">
+    <h2 class="section-title">Analyze a product</h2>
+    <p class="section-desc">Paste SDS text, spec sheet content, pricing/contract info, and any notes. The engine extracts a standardized record, computes dilution and RTU cost, and scores it against your database for comparable products.</p>
+
+    <div class="panel">
+      <div class="grid2">
+        <div>
+          <div class="field">
+            <label>Product name / identifier (optional)</label>
+            <input type="text" id="inName" placeholder="e.g. Lime-A-Way 4/1gl">
+          </div>
+          <div class="field">
+            <label>SDS / Specification / Manufacturer text</label>
+            <textarea id="inSDS" placeholder="Paste SDS text, product spec sheet, or manufacturer info here…" style="min-height:220px;"></textarea>
+          </div>
+        </div>
+        <div>
+          <div class="field">
+            <label>Pricing / supplier / contract info (optional)</label>
+            <textarea id="inPricing" placeholder="e.g. Price: $42.50/case, Pack size: 4 x 1 gallon, Vendor: Prime Source GPO, Contract #…" style="min-height:120px;"></textarea>
+          </div>
+          <div class="field">
+            <label>User notes (optional)</label>
+            <textarea id="inNotes" placeholder="Any additional context, category hints, or comparison targets…" style="min-height:80px;"></textarea>
+          </div>
+          <div class="hint">Fields don't need to be split cleanly — paste everything into the SDS box if that's easier.</div>
+        </div>
+      </div>
+      <div class="row" style="margin-top:14px;">
+        <button class="btn" id="btnAnalyze">Analyze product</button>
+        <button class="btn ghost" id="btnClearInputs">Clear</button>
+        <div class="spacer"></div>
+        <span id="analyzeMsg" class="hint"></span>
+      </div>
+    </div>
+
+    <div id="resultWrap" style="margin-top:20px; display:none;"></div>
+  </div>
+
+  <!-- ================= DATABASE ================= -->
+  <div class="view" id="view-database">
+    <h2 class="section-title">Product database</h2>
+    <p class="section-desc">All saved product records. Search, filter, edit, or export.</p>
+
+    <div class="search-bar">
+      <input type="text" id="dbSearch" placeholder="Search by name, brand, category, tag…">
+      <select id="dbCategoryFilter"><option value="">All categories</option></select>
+      <button class="btn secondary small" id="btnExportCSV">Export CSV</button>
+    </div>
+
+    <div class="panel" style="padding:0; overflow:auto;">
+      <table id="dbTable">
+        <thead>
+          <tr>
+            <th>Product</th><th>Category</th><th>Form</th><th>Dilution</th><th>RTU $/gal</th><th>Confidence</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="dbTableBody"></tbody>
+      </table>
+      <div class="empty-state" id="dbEmptyState">
+        <div class="big">🧪</div>
+        No products yet — analyze one to add it to the database.
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= COMPARE ================= -->
+  <div class="view" id="view-compare">
+    <h2 class="section-title">Compare &amp; match</h2>
+    <p class="section-desc">Pick a product to see its closest comparable matches in the database, scored by category, application, chemical type, form, and dilution similarity.</p>
+
+    <div class="panel">
+      <div class="field" style="max-width:420px;">
+        <label>Select a product</label>
+        <select id="compareSelect"><option value="">— choose a product —</option></select>
+      </div>
+      <div id="compareResults"></div>
+    </div>
+  </div>
+
+  <!-- ================= SETTINGS ================= -->
+  <div class="view" id="view-settings">
+    <h2 class="section-title">Settings</h2>
+    <p class="section-desc">Configuration is stored locally in your browser only.</p>
+
+    <div class="panel" style="max-width:520px;">
+      <div class="field">
+        <label>Groq API key</label>
+        <input type="password" id="groqKey" placeholder="gsk_…">
+        <div class="hint">Used for llama-3.3-70b-versatile extraction calls. Get a key at <code class="inline">console.groq.com</code>. Stored in localStorage, never sent anywhere else.</div>
+      </div>
+      <div class="row">
+        <button class="btn" id="btnSaveKey">Save key</button>
+        <button class="btn ghost" id="btnTestKey">Test connection</button>
+      </div>
+      <div class="hint" id="keyPreview" style="margin-top:10px;"></div>
+      <hr style="margin:22px 0; border:none; border-top:1px solid var(--border);">
+      <div class="field">
+        <label>Database</label>
+        <div class="hint" style="margin-bottom:8px;"><span id="settingsDbCount">0</span> products stored locally.</div>
+        <div class="row">
+          <button class="btn ghost small" id="btnExportJSON">Export JSON backup</button>
+          <button class="btn ghost small" id="btnImportJSON">Import JSON backup</button>
+          <button class="btn danger small" id="btnWipeDb">Wipe database</button>
+        </div>
+        <input type="file" id="importFile" accept="application/json" style="display:none;">
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div class="modal-backdrop" id="editModalBackdrop">
+  <div class="modal">
+    <h3>Edit product</h3>
+    <div id="editModalBody"></div>
+    <div class="row" style="margin-top:16px;">
+      <button class="btn" id="btnSaveEdit">Save changes</button>
+      <button class="btn ghost" id="btnCancelEdit">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* =========================================================
+   STATE
+========================================================= */
+const LS_KEY_PRODUCTS = 'cpie_products';
+const LS_KEY_APIKEY = 'cpie_groq_key';
+const GROQ_MODEL = 'openai/gpt-oss-120b';
+
+let products = loadProducts();
+let currentResult = null; // last analyzed (unsaved) product
+let editingId = null;
+
+function loadProducts(){
+  try{ return JSON.parse(localStorage.getItem(LS_KEY_PRODUCTS)) || []; }catch(e){ return []; }
+}
+function saveProducts(){
+  localStorage.setItem(LS_KEY_PRODUCTS, JSON.stringify(products));
+  refreshDbCount();
+}
+function getApiKey(){ return sanitizeKey(localStorage.getItem(LS_KEY_APIKEY) || ''); }
+function sanitizeKey(raw){
+  // Strip whitespace, newlines, and zero-width/invisible unicode characters that can
+  // survive a copy-paste from a browser, PDF, or password manager.
+  return String(raw)
+    .replace(/[\u200B-\u200F\uFEFF\u00A0]/g, '')
+    .replace(/\s+/g, '')
+    .trim();
+}
+
+const SCHEMA_FIELDS = ["product_id","product_name","brand","manufacturer","category","subcategory",
+  "product_form","chemical_type","application","recommended_use","restrictions_on_use","dilution_type",
+  "minimum_dilution_percent","maximum_dilution_percent","minimum_dilution_ratio","maximum_dilution_ratio",
+  "rtu_yield_liters","rtu_yield_gallons","pack_size","uom","price","price_per_unit","rtu_cost_per_liter",
+  "rtu_cost_per_gallon","hazard_classification","ppe_required","green_certifications","epa_registered",
+  "contract_vendor","supplier","tags","comparable_categories","comparable_products","match_keywords",
+  "confidence_score","ai_summary"];
+
+/* =========================================================
+   SYSTEM PROMPT (Chemical Product Intelligence Engine spec)
+========================================================= */
+const SYSTEM_PROMPT = `You are a Chemical Product Intelligence Engine.
+
+Your role is to analyze product entries, Safety Data Sheets (SDS), product specifications, manufacturer information, and pricing data, and build a standardized procurement/operations database record.
+
+Extract as much information as possible. Never leave a field blank when a value can reasonably be inferred. If information is truly unavailable, use null.
+
+Return ONLY a single valid JSON object — no markdown fences, no commentary — with exactly these keys:
+product_id, product_name, brand, manufacturer, category, subcategory, product_form, chemical_type,
+application (array), recommended_use, restrictions_on_use, dilution_type, minimum_dilution_percent,
+maximum_dilution_percent, minimum_dilution_ratio, maximum_dilution_ratio, rtu_yield_liters, rtu_yield_gallons,
+pack_size, uom, price, price_per_unit, rtu_cost_per_liter, rtu_cost_per_gallon, hazard_classification,
+ppe_required (array), green_certifications (array), epa_registered, contract_vendor, supplier, tags (array),
+comparable_categories (array), comparable_products (array), match_keywords (array), confidence_score, ai_summary.
+
+CATEGORY: classify every product (e.g. Delimer, Degreaser, Dishmachine Detergent, Glass Cleaner, Floor Cleaner,
+Disinfectant, Laundry Detergent, Rinse Aid, Sanitizer, Scale Remover, Coffee Equipment Cleaner, All Purpose Cleaner,
+Bathroom Cleaner, Oven Cleaner). If unclear, create the most logical category from SDS use information.
+
+SUBCATEGORY: e.g. Acid Delimer, Neutral Cleaner, Heavy Duty Degreaser, Food Contact Sanitizer,
+Warewashing Delimer, Machine Delimer, Scale Dissolver.
+
+PRODUCT FORM: Tablet, Block, Powder, Liquid, Capsule, Solid Dose, Granular, Concentrate, Ready To Use, Foam.
+
+DILUTION: search for dilution ratio / use dilution / recommended concentration / working solution language
+(e.g. "0.7%-4%", "1:64", "1 oz per gallon", "30 ml/L"). Convert to percentage AND ratio where possible, and
+note minimum/maximum. If the product is sold ready-to-use, dilution_type should reflect that and dilution
+percent/ratio fields should be null.
+
+RTU CALCULATIONS: if pricing is available, calculate cost per ounce/liter/gallon. If dilution data is also
+available, calculate RTU yield (liters and gallons) and RTU cost per liter/gallon at the given dilution.
+
+TAGS: generate 5-20 auto tags (e.g. Delimer, Acid Based, Scale Removal, Food Service, Laundry, Warewashing,
+Kitchen, Floor Care, Tablet, RTU, Concentrate, Eco Friendly, Cost Saving Opportunity, High Hazard, Low Hazard).
+
+COMPARABLE PRODUCTS: comparable_categories should list category-level siblings this product could be matched
+against (e.g. other delimers). comparable_products should suggest 1-3 real, commonly known competing/reference
+products in the same space if you can reasonably infer them (e.g. "Lime-A-Way", "Scale Kleen"), or an empty
+array if none can be reasonably inferred — never invent implausible brand names.
+
+CONFIDENCE SCORE (0-100): 95-100 if the SDS explicitly states the value, 80-94 if a specification document
+provides it, 60-79 if manufacturer information suggests it, below 60 if inferred. Return one overall
+confidence_score for the record as a number (string or number is fine).
+
+AI SUMMARY: write a 2-4 sentence executive summary covering what the product is, its dilution range if
+applicable, its RTU cost position if calculable, its category, and what it could be compared against.
+
+Only ever return the JSON object.`;
+
+const FEWSHOT = [
+  { role:'user', content:
+`Product name : LIME-A-WAY
+Recommended use : Delimer
+Restrictions on use : Reserved for industrial and professional use.
+Product dilution information : Product is sold ready to use.
+Company : ECOLAB PTY LTD, 2 Drake Avenue, Macquarie Park, NSW Australia 2113
+Issuing date : 20.11.2020
+Pricing info: Pack size 4/1gl, case price $58.00. Supplier: Prime Source GPO.` },
+  { role:'assistant', content: JSON.stringify({
+    product_id: "LIMEAWAY-4-1GL",
+    product_name: "Lime-A-Way",
+    brand: "Lime-A-Way",
+    manufacturer: "Ecolab Pty Ltd",
+    category: "Delimer",
+    subcategory: "Ready To Use Delimer",
+    product_form: "Ready To Use",
+    chemical_type: "Acid-based (inferred)",
+    application: ["Scale removal","Foodservice equipment"],
+    recommended_use: "Delimer",
+    restrictions_on_use: "Reserved for industrial and professional use.",
+    dilution_type: "Ready To Use — no dilution required",
+    minimum_dilution_percent: null,
+    maximum_dilution_percent: null,
+    minimum_dilution_ratio: null,
+    maximum_dilution_ratio: null,
+    rtu_yield_liters: 3.785,
+    rtu_yield_gallons: 1,
+    pack_size: "4 x 1 gallon",
+    uom: "case",
+    price: 58.00,
+    price_per_unit: 14.50,
+    rtu_cost_per_liter: 3.83,
+    rtu_cost_per_gallon: 14.50,
+    hazard_classification: "Not specified in excerpt",
+    ppe_required: [],
+    green_certifications: [],
+    epa_registered: null,
+    contract_vendor: "Prime Source GPO",
+    supplier: "Prime Source GPO",
+    tags: ["Delimer","RTU","Scale Removal","Food Service","Liquid","Warewashing"],
+    comparable_categories: ["Delimer","Scale Remover"],
+    comparable_products: ["Monogram Clean Force Delimer","Scale Kleen"],
+    match_keywords: ["delimer","lime scale","ready to use","foodservice"],
+    confidence_score: 78,
+    ai_summary: "Lime-A-Way is a ready-to-use delimer for industrial/professional foodservice equipment, requiring no dilution. At a case price of $58.00 for four 1-gallon units, RTU cost runs roughly $14.50/gallon, which is a useful baseline against concentrate or solid-dose delimers where lower per-gallon costs are typical."
+  }) },
+  { role:'user', content:
+`Product name : MONOGRAM CLEAN FORCE DELIMER (MCF SOLID DOSE DELIMER TABLET - 30-40 G)
+Recommended use : Delimer
+Restrictions on use : Reserved for industrial and professional use.
+Product dilution information : 0.7 % - 4.0 %
+Company : Ecolab Inc., 1 Ecolab Place, St. Paul, Minnesota USA 55102
+Issuing date : 11/13/2019
+Pricing info: 40 tablets per case, case price $96.00. Supplier: Prime Source GPO.` },
+  { role:'assistant', content: JSON.stringify({
+    product_id: "MCF-SOLIDDOSE-30-40G",
+    product_name: "Monogram Clean Force Delimer",
+    brand: "Monogram Clean Force",
+    manufacturer: "Ecolab Inc.",
+    category: "Delimer",
+    subcategory: "Acid Delimer",
+    product_form: "Solid Dose",
+    chemical_type: "Acid-based",
+    application: ["Scale removal","Warewashing equipment"],
+    recommended_use: "Delimer",
+    restrictions_on_use: "Reserved for industrial and professional use.",
+    dilution_type: "Percentage dilution",
+    minimum_dilution_percent: 0.7,
+    maximum_dilution_percent: 4.0,
+    minimum_dilution_ratio: "1:142 (approx.)",
+    maximum_dilution_ratio: "1:24 (approx.)",
+    rtu_yield_liters: 142.8,
+    rtu_yield_gallons: 37.7,
+    pack_size: "40 tablets x 30-40g",
+    uom: "case",
+    price: 96.00,
+    price_per_unit: 2.40,
+    rtu_cost_per_liter: 0.017,
+    rtu_cost_per_gallon: 0.064,
+    hazard_classification: "Not specified in excerpt",
+    ppe_required: [],
+    green_certifications: [],
+    epa_registered: null,
+    contract_vendor: "Prime Source GPO",
+    supplier: "Prime Source GPO",
+    tags: ["Delimer","Acid Based","Scale Removal","Tablet","Solid Dose","Warewashing","Cost Saving Opportunity"],
+    comparable_categories: ["Delimer","Scale Remover"],
+    comparable_products: ["Lime-A-Way","Scale Kleen"],
+    match_keywords: ["delimer","tablet","solid dose","scale removal","warewashing"],
+    confidence_score: 92,
+    ai_summary: "Monogram Clean Force Delimer is a concentrated acid-based solid-dose tablet delimer for scale removal in warewashing applications, with a recommended dilution of 0.7%-4.0%. At the minimum dilution, RTU cost runs a small fraction of a cent per gallon, making it dramatically cheaper per gallon than a ready-to-use liquid delimer like Lime-A-Way — a strong cost-saving opportunity when converting facilities from RTU liquid to solid dose."
+  }) }
+];
+
+/* =========================================================
+   TAB NAVIGATION
+========================================================= */
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('view-'+btn.dataset.view).classList.add('active');
+    if(btn.dataset.view==='database') renderDatabase();
+    if(btn.dataset.view==='compare') populateCompareSelect();
+    if(btn.dataset.view==='settings') refreshDbCount();
+  });
+});
+
+/* =========================================================
+   TOAST
+========================================================= */
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+
+/* =========================================================
+   SETTINGS
+========================================================= */
+function refreshKeyStatus(){
+  const key = getApiKey();
+  document.getElementById('keyDot').classList.toggle('ok', !!key);
+  document.getElementById('keyStatusText').textContent = key ? 'API key set' : 'API key not set';
+  document.getElementById('groqKey').value = key;
+  const preview = document.getElementById('keyPreview');
+  if(preview){
+    if(!key){
+      preview.textContent = '';
+    }else{
+      const looksRight = /^gsk_/.test(key);
+      const masked = key.length > 8 ? key.slice(0,5) + '…' + key.slice(-4) : key;
+      preview.innerHTML = 'Stored key: <code class="inline">' + masked + '</code> (' + key.length + ' chars)'
+        + (looksRight ? '' : ' — <span style="color:var(--red); font-weight:600;">this doesn\'t start with "gsk_", which is unusual for a Groq key. Double-check it was copied correctly.</span>');
+    }
+  }
+}
+document.getElementById('btnSaveKey').addEventListener('click', ()=>{
+  const val = sanitizeKey(document.getElementById('groqKey').value);
+  localStorage.setItem(LS_KEY_APIKEY, val);
+  refreshKeyStatus();
+  toast('API key saved locally.');
+});
+document.getElementById('btnTestKey').addEventListener('click', async ()=>{
+  const key = getApiKey();
+  if(!key){ toast('Set an API key first.'); return; }
+  try{
+    const res = await callGroq([{role:'user', content:'Reply with the single word OK.'}], false);
+    toast(res && res.toLowerCase().includes('ok') ? 'Connection OK.' : 'Connected, but response was unexpected.');
+  }catch(e){ toast('Connection failed: ' + e.message); }
+});
+
+function refreshDbCount(){
+  document.getElementById('dbCount').textContent = products.length ? `(${products.length})` : '';
+  document.getElementById('settingsDbCount').textContent = products.length;
+}
+
+document.getElementById('btnExportJSON').addEventListener('click', ()=>{
+  downloadFile('chem-intel-backup.json', JSON.stringify(products, null, 2), 'application/json');
+});
+document.getElementById('btnImportJSON').addEventListener('click', ()=>document.getElementById('importFile').click());
+document.getElementById('importFile').addEventListener('change', (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const imported = JSON.parse(reader.result);
+      if(!Array.isArray(imported)) throw new Error('File is not a product array.');
+      const existingIds = new Set(products.map(p=>p.product_id));
+      let added=0;
+      imported.forEach(p=>{ if(!existingIds.has(p.product_id)){ products.push(p); added++; } });
+      saveProducts();
+      toast(`Imported ${added} new product(s).`);
+    }catch(err){ toast('Import failed: ' + err.message); }
+  };
+  reader.readAsText(file);
+});
+document.getElementById('btnWipeDb').addEventListener('click', ()=>{
+  if(confirm('Delete all stored products? This cannot be undone.')){
+    products = []; saveProducts(); renderDatabase();
+    toast('Database wiped.');
+  }
+});
+
+/* =========================================================
+   GROQ CALL
+========================================================= */
+async function callGroq(messages, jsonMode){
+  const key = getApiKey();
+  if(!key) throw new Error('No Groq API key set. Add one in Settings.');
+  const body = {
+    model: GROQ_MODEL,
+    messages: messages,
+    temperature: 0.2,
+    max_tokens: 2000
+  };
+  if(jsonMode) body.response_format = { type: 'json_object' };
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + key },
+    body: JSON.stringify(body)
+  });
+  if(!res.ok){
+    const errText = await res.text().catch(()=> '');
+    throw new Error(`Groq API error (${res.status}): ${errText.slice(0,200)}`);
+  }
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content ?? '';
+}
+
+/* =========================================================
+   ANALYZE
+========================================================= */
+document.getElementById('btnClearInputs').addEventListener('click', ()=>{
+  document.getElementById('inName').value='';
+  document.getElementById('inSDS').value='';
+  document.getElementById('inPricing').value='';
+  document.getElementById('inNotes').value='';
+});
+
+document.getElementById('btnAnalyze').addEventListener('click', analyzeProduct);
+
+async function analyzeProduct(){
+  const name = document.getElementById('inName').value.trim();
+  const sds = document.getElementById('inSDS').value.trim();
+  const pricing = document.getElementById('inPricing').value.trim();
+  const notes = document.getElementById('inNotes').value.trim();
+
+  if(!sds && !pricing && !notes){
+    toast('Paste some product information first.');
+    return;
+  }
+  if(!getApiKey()){
+    toast('Add a Groq API key in Settings first.');
+    return;
+  }
+
+  const btn = document.getElementById('btnAnalyze');
+  btn.disabled = true; btn.innerHTML = '<span class="loader"></span>Analyzing…';
+  document.getElementById('analyzeMsg').textContent = '';
+
+  let userContent = '';
+  if(name) userContent += `Product name (as given by user): ${name}\n\n`;
+  if(sds) userContent += `SDS / Specification / Manufacturer text:\n${sds}\n\n`;
+  if(pricing) userContent += `Pricing / supplier / contract info:\n${pricing}\n\n`;
+  if(notes) userContent += `User notes:\n${notes}\n\n`;
+
+  const messages = [
+    { role:'system', content: SYSTEM_PROMPT },
+    ...FEWSHOT,
+    { role:'user', content: userContent }
+  ];
+
+  try{
+    const raw = await callGroq(messages, true);
+    let parsed = safeParseJSON(raw);
+    if(!parsed) throw new Error('Model did not return valid JSON.');
+    parsed = normalizeRecord(parsed);
+    parsed = recomputeRTU(parsed);
+    if(!parsed.product_id) parsed.product_id = makeId(parsed.product_name || name || 'product');
+    currentResult = parsed;
+    renderResult(parsed);
+    document.getElementById('analyzeMsg').textContent = 'Done. Review below, then save to the database.';
+  }catch(e){
+    toast('Analysis failed: ' + e.message);
+    document.getElementById('analyzeMsg').textContent = e.message;
+  }finally{
+    btn.disabled = false; btn.textContent = 'Analyze product';
+  }
+}
+
+function safeParseJSON(text){
+  if(!text) return null;
+  let cleaned = text.trim().replace(/^```json/i,'').replace(/^```/,'').replace(/```$/,'').trim();
+  try{ return JSON.parse(cleaned); }catch(e){}
+  const start = cleaned.indexOf('{'), end = cleaned.lastIndexOf('}');
+  if(start>=0 && end>start){
+    try{ return JSON.parse(cleaned.slice(start,end+1)); }catch(e){}
+  }
+  return null;
+}
+
+function normalizeRecord(obj){
+  const rec = {};
+  SCHEMA_FIELDS.forEach(f=>{
+    let v = obj[f];
+    if(v===undefined) v = null;
+    rec[f]=v;
+  });
+  ['application','ppe_required','green_certifications','tags','comparable_categories','comparable_products','match_keywords'].forEach(f=>{
+    if(!Array.isArray(rec[f])) rec[f] = rec[f] ? [rec[f]] : [];
+  });
+  return rec;
+}
+
+function makeId(name){
+  return (name||'product').toUpperCase().replace(/[^A-Z0-9]+/g,'-').replace(/(^-|-$)/g,'').slice(0,40) + '-' + Math.random().toString(36).slice(2,6).toUpperCase();
+}
+
+/* ---- RTU recompute (client-side, deterministic, overrides model math where possible) ---- */
+function toGallons(qty, unit){
+  if(qty==null || unit==null) return null;
+  unit = String(unit).toLowerCase();
+  const gal = {gallon:1, gallons:1, gal:1, liter:0.264172, liters:0.264172, l:0.264172,
+    ml:0.000264172, milliliter:0.000264172, oz:0.0078125, 'fl oz':0.0078125, ounce:0.0078125,
+    quart:0.25, qt:0.25, pint:0.125};
+  if(gal[unit]!=null) return qty*gal[unit];
+  return null;
+}
+function recomputeRTU(rec){
+  // Attempt to parse a numeric price and pack size volume; if not parseable, leave model's values.
+  const priceNum = parseFloat(rec.price);
+  if(isNaN(priceNum)) return rec;
+
+  const minPct = parseFloat(rec.minimum_dilution_percent);
+  const maxPct = parseFloat(rec.maximum_dilution_percent);
+  const hasPct = !isNaN(minPct) && !isNaN(maxPct) && minPct>0 && maxPct>0;
+
+  // Try to detect concentrate volume in gallons from pack_size/uom text.
+  let concGal = null;
+  const packText = `${rec.pack_size||''} ${rec.uom||''}`.toLowerCase();
+  const galMatch = packText.match(/(\d+(\.\d+)?)\s*x?\s*(\d+(\.\d+)?)?\s*(gallon|gal)/);
+  if(galMatch){
+    const a = parseFloat(galMatch[1]); const b = galMatch[3]?parseFloat(galMatch[3]):null;
+    concGal = b ? a*b : a;
+  }
+  const literMatch = !concGal && packText.match(/(\d+(\.\d+)?)\s*x?\s*(\d+(\.\d+)?)?\s*(liter|litre|l)\b/);
+  if(literMatch){
+    const a = parseFloat(literMatch[1]); const b = literMatch[3]?parseFloat(literMatch[3]):null;
+    concGal = (b ? a*b : a) * 0.264172;
+  }
+
+  if(rec.dilution_type && /ready to use|rtu/i.test(rec.dilution_type) && concGal){
+    rec.rtu_yield_gallons = round(concGal,3);
+    rec.rtu_yield_liters = round(concGal/0.264172,3);
+    rec.rtu_cost_per_gallon = round(priceNum/concGal,3);
+    rec.rtu_cost_per_liter = round((priceNum/concGal)*0.264172,4);
+    rec.price_per_unit = rec.price_per_unit ?? round(priceNum/concGal,3);
+    return rec;
+  }
+
+  if(hasPct && concGal){
+    const avgPct = (minPct+maxPct)/2;
+    const yieldGalAtAvg = concGal / (avgPct/100);
+    const yieldGalMin = concGal / (maxPct/100); // higher % = less yield
+    const yieldGalMax = concGal / (minPct/100); // lower % = more yield
+    rec.rtu_yield_gallons = round(yieldGalAtAvg,2);
+    rec.rtu_yield_liters = round(yieldGalAtAvg/0.264172,2);
+    rec.rtu_cost_per_gallon = round(priceNum/yieldGalAtAvg,4);
+    rec.rtu_cost_per_liter = round((priceNum/yieldGalAtAvg)*0.264172,5);
+    rec._rtu_yield_range_gal = [round(yieldGalMin,2), round(yieldGalMax,2)];
+    rec._rtu_cost_range_gal = [round(priceNum/yieldGalMax,4), round(priceNum/yieldGalMin,4)];
+  }
+  return rec;
+}
+function round(n,d){ return isFinite(n) ? Number(n.toFixed(d)) : null; }
+
+/* =========================================================
+   RESULT RENDERING
+========================================================= */
+function renderResult(rec){
+  const wrap = document.getElementById('resultWrap');
+  wrap.style.display = 'block';
+  wrap.innerHTML = `
+    <div class="panel">
+      <div class="row" style="margin-bottom:14px;">
+        <div>
+          <div style="font-size:17px; font-weight:700;">${esc(rec.product_name)||'Unnamed product'}</div>
+          <div style="color:var(--ink-soft); font-size:12.5px; margin-top:2px;">${esc(rec.brand)||'—'} · ${esc(rec.manufacturer)||'—'}</div>
+        </div>
+        <div class="spacer"></div>
+        ${confBadge(rec.confidence_score)}
+      </div>
+
+      <div>${(rec.tags||[]).map(t=>pill(t)).join('')}</div>
+
+      <div class="field-grid" style="margin-top:16px;">
+        ${kv('Category', rec.category)}
+        ${kv('Subcategory', rec.subcategory)}
+        ${kv('Product form', rec.product_form)}
+        ${kv('Chemical type', rec.chemical_type)}
+        ${kv('Hazard classification', rec.hazard_classification)}
+        ${kv('EPA registered', rec.epa_registered)}
+        ${kv('Dilution type', rec.dilution_type)}
+        ${kv('Min dilution', fmtPct(rec.minimum_dilution_percent))}
+        ${kv('Max dilution', fmtPct(rec.maximum_dilution_percent))}
+        ${kv('Min ratio', rec.minimum_dilution_ratio)}
+        ${kv('Max ratio', rec.maximum_dilution_ratio)}
+        ${kv('Pack size', rec.pack_size)}
+        ${kv('Price', fmtMoney(rec.price))}
+        ${kv('Price per unit', fmtMoney(rec.price_per_unit))}
+        ${kv('RTU yield (gal)', rec.rtu_yield_gallons)}
+        ${kv('RTU yield (L)', rec.rtu_yield_liters)}
+        ${kv('RTU cost / gal', fmtMoney(rec.rtu_cost_per_gallon))}
+        ${kv('RTU cost / L', fmtMoney(rec.rtu_cost_per_liter))}
+        ${kv('Contract vendor', rec.contract_vendor)}
+        ${kv('Supplier', rec.supplier)}
+      </div>
+
+      ${rec._rtu_cost_range_gal ? `<div class="hint" style="margin-top:8px;">Across the stated dilution range, RTU cost spans approximately $${rec._rtu_cost_range_gal[0]} – $${rec._rtu_cost_range_gal[1]} per gallon.</div>` : ''}
+
+      <div class="summary-box">
+        <div class="label">AI Summary</div>
+        ${esc(rec.ai_summary) || '<span style="opacity:.6;">No summary generated.</span>'}
+      </div>
+
+      ${(rec.comparable_products&&rec.comparable_products.length) ? `
+      <div style="margin-top:14px;">
+        <label>Suggested comparable products</label>
+        ${rec.comparable_products.map(p=>pill(p,'grey')).join('')}
+      </div>` : ''}
+
+      <div class="row" style="margin-top:18px;">
+        <button class="btn" id="btnSaveResult">Save to database</button>
+        <button class="btn ghost" id="btnEditResult">Edit fields</button>
+        <div class="spacer"></div>
+        <span class="hint">product_id: <code class="inline">${esc(rec.product_id)}</code></span>
+      </div>
+    </div>
+  `;
+  document.getElementById('btnSaveResult').addEventListener('click', ()=>{
+    const idx = products.findIndex(p=>p.product_id===rec.product_id);
+    if(idx>=0) products[idx]=rec; else products.push(rec);
+    saveProducts();
+    toast('Saved to database.');
+  });
+  document.getElementById('btnEditResult').addEventListener('click', ()=>openEditModal(rec, false));
+}
+
+function confBadge(score){
+  const n = parseFloat(score);
+  const tier = isNaN(n) ? {c:'grey', label:'Unknown'} : n>=95 ? {c:'green', label:'SDS-stated'} : n>=80 ? {c:'teal', label:'Spec-provided'} : n>=60 ? {c:'amber', label:'Manufacturer info'} : {c:'red', label:'Inferred'};
+  return `<div style="text-align:right;">
+    <div class="conf-bar" style="display:inline-block; vertical-align:middle;"><div style="width:${isNaN(n)?0:n}%;"></div></div>
+    <span class="pill ${tier.c}" style="margin-left:8px;">${isNaN(n)?'—':n} · ${tier.label}</span>
+  </div>`;
+}
+function kv(label,val){
+  const empty = val===null || val===undefined || val==='';
+  return `<div class="kv"><div class="k">${esc(label)}</div><div class="v ${empty?'empty':''}">${empty?'null':esc(val)}</div></div>`;
+}
+function pill(text, cls){ return `<span class="pill ${cls||'teal'}">${esc(text)}</span>`; }
+function fmtMoney(v){ if(v===null||v===undefined||v==='') return null; const n=parseFloat(v); return isNaN(n)?v:'$'+n.toFixed(2); }
+function fmtPct(v){ if(v===null||v===undefined||v==='') return null; const n=parseFloat(v); return isNaN(n)?v:n+'%'; }
+function esc(s){ if(s===null||s===undefined) return ''; return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* =========================================================
+   EDIT MODAL (works for both unsaved result & saved db rows)
+========================================================= */
+function openEditModal(rec, isSaved){
+  editingId = isSaved ? rec.product_id : null;
+  const body = document.getElementById('editModalBody');
+  body.innerHTML = SCHEMA_FIELDS.map(f=>{
+    const v = Array.isArray(rec[f]) ? rec[f].join(', ') : (rec[f]??'');
+    return `<div class="field"><label>${f}</label><input type="text" data-field="${f}" value="${esc(v)}"></div>`;
+  }).join('');
+  document.getElementById('editModalBackdrop').classList.add('show');
+  document.getElementById('editModalBackdrop')._targetRec = rec;
+  document.getElementById('editModalBackdrop')._isSaved = isSaved;
+}
+document.getElementById('btnCancelEdit').addEventListener('click', ()=>{
+  document.getElementById('editModalBackdrop').classList.remove('show');
+});
+document.getElementById('btnSaveEdit').addEventListener('click', ()=>{
+  const backdrop = document.getElementById('editModalBackdrop');
+  const rec = backdrop._targetRec;
+  const isSaved = backdrop._isSaved;
+  document.querySelectorAll('#editModalBody [data-field]').forEach(inp=>{
+    const f = inp.dataset.field;
+    const arrFields = ['application','ppe_required','green_certifications','tags','comparable_categories','comparable_products','match_keywords'];
+    rec[f] = arrFields.includes(f) ? inp.value.split(',').map(s=>s.trim()).filter(Boolean) : (inp.value===''?null:inp.value);
+  });
+  if(isSaved){
+    const idx = products.findIndex(p=>p.product_id===editingId);
+    if(idx>=0) products[idx]=rec;
+    saveProducts(); renderDatabase();
+  }else{
+    currentResult = rec;
+    renderResult(rec);
+  }
+  backdrop.classList.remove('show');
+  toast('Changes applied.');
+});
+
+/* =========================================================
+   DATABASE VIEW
+========================================================= */
+document.getElementById('dbSearch').addEventListener('input', renderDatabase);
+document.getElementById('dbCategoryFilter').addEventListener('change', renderDatabase);
+
+function renderDatabase(){
+  const q = document.getElementById('dbSearch').value.trim().toLowerCase();
+  const catFilter = document.getElementById('dbCategoryFilter').value;
+
+  const cats = [...new Set(products.map(p=>p.category).filter(Boolean))].sort();
+  const sel = document.getElementById('dbCategoryFilter');
+  const prevVal = sel.value;
+  sel.innerHTML = '<option value="">All categories</option>' + cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  sel.value = prevVal;
+
+  const filtered = products.filter(p=>{
+    if(catFilter && p.category!==catFilter) return false;
+    if(!q) return true;
+    const hay = [p.product_name,p.brand,p.category,p.subcategory,...(p.tags||[])].join(' ').toLowerCase();
+    return hay.includes(q);
+  });
+
+  const tbody = document.getElementById('dbTableBody');
+  tbody.innerHTML = filtered.map(p=>`
+    <tr>
+      <td><strong>${esc(p.product_name)||'—'}</strong><br><span style="color:var(--ink-faint); font-size:11.5px;">${esc(p.brand)||''}</span></td>
+      <td>${esc(p.category)||'—'}${p.subcategory?`<br><span style="color:var(--ink-faint); font-size:11.5px;">${esc(p.subcategory)}</span>`:''}</td>
+      <td>${esc(p.product_form)||'—'}</td>
+      <td class="mono">${dilutionLabel(p)}</td>
+      <td class="mono">${p.rtu_cost_per_gallon!=null?'$'+parseFloat(p.rtu_cost_per_gallon).toFixed(3):'—'}</td>
+      <td>${confBadge(p.confidence_score)}</td>
+      <td>
+        <button class="btn ghost small" onclick="viewProduct('${p.product_id}')">View</button>
+        <button class="btn ghost small" onclick="editProductById('${p.product_id}')">Edit</button>
+        <button class="btn danger small" onclick="deleteProduct('${p.product_id}')">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+  document.getElementById('dbEmptyState').style.display = filtered.length ? 'none' : 'block';
+  refreshDbCount();
+}
+function dilutionLabel(p){
+  if(p.dilution_type && /ready to use|rtu/i.test(p.dilution_type)) return 'RTU';
+  if(p.minimum_dilution_percent!=null && p.maximum_dilution_percent!=null) return `${p.minimum_dilution_percent}–${p.maximum_dilution_percent}%`;
+  if(p.minimum_dilution_ratio) return String(p.minimum_dilution_ratio);
+  return '—';
+}
+window.viewProduct = function(id){
+  const p = products.find(x=>x.product_id===id); if(!p) return;
+  document.querySelector('.tab-btn[data-view="analyze"]').click();
+  currentResult = p;
+  renderResult(p);
+  window.scrollTo({top:0, behavior:'smooth'});
+};
+window.editProductById = function(id){
+  const p = products.find(x=>x.product_id===id); if(!p) return;
+  openEditModal(p, true);
+};
+window.deleteProduct = function(id){
+  if(!confirm('Delete this product from the database?')) return;
+  products = products.filter(p=>p.product_id!==id);
+  saveProducts(); renderDatabase();
+  toast('Product deleted.');
+};
+
+document.getElementById('btnExportCSV').addEventListener('click', ()=>{
+  if(!products.length){ toast('No products to export.'); return; }
+  const cols = ['product_id','product_name','brand','manufacturer','category','subcategory','product_form',
+    'chemical_type','dilution_type','minimum_dilution_percent','maximum_dilution_percent','pack_size','price',
+    'rtu_cost_per_gallon','rtu_cost_per_liter','contract_vendor','supplier','confidence_score'];
+  const rows = [cols.join(',')].concat(products.map(p=>cols.map(c=>csvCell(p[c])).join(',')));
+  downloadFile('chem-intel-products.csv', rows.join('\n'), 'text/csv');
+});
+function csvCell(v){
+  if(v===null||v===undefined) return '';
+  const s = String(v).replace(/"/g,'""');
+  return /[",\n]/.test(s) ? `"${s}"` : s;
+}
+function downloadFile(filename, content, mime){
+  const blob = new Blob([content], {type:mime});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
+/* =========================================================
+   COMPARE / MATCH
+========================================================= */
+function populateCompareSelect(){
+  const sel = document.getElementById('compareSelect');
+  sel.innerHTML = '<option value="">— choose a product —</option>' +
+    products.map(p=>`<option value="${p.product_id}">${esc(p.product_name)||p.product_id}</option>`).join('');
+}
+document.getElementById('compareSelect').addEventListener('change', (e)=>{
+  const id = e.target.value;
+  const wrap = document.getElementById('compareResults');
+  if(!id){ wrap.innerHTML=''; return; }
+  const target = products.find(p=>p.product_id===id);
+  const scored = products.filter(p=>p.product_id!==id).map(p=>({p, score: matchScore(target,p)}))
+    .sort((a,b)=>b.score.total-a.score.total);
+
+  if(!scored.length){
+    wrap.innerHTML = `<div class="empty-state"><div class="big">🔎</div>Add more products to the database to see matches.</div>`;
+    return;
+  }
+  wrap.innerHTML = `<div style="margin-top:18px;">` + scored.map(({p,score})=>`
+    <div class="match-item">
+      <div class="info">
+        <div class="name">${esc(p.product_name)||p.product_id}</div>
+        <div class="cat">${esc(p.category)||'—'} · ${esc(p.product_form)||'—'} · ${esc(p.brand)||'—'}</div>
+      </div>
+      <div class="match-score">
+        <div class="num">${score.total}%</div>
+        <div class="pill ${score.tier.c}">${score.tier.label}</div>
+      </div>
+    </div>
+  `).join('') + `</div>`;
+});
+
+function matchScore(a,b){
+  let score = 0;
+  const catMatch = a.category && b.category && a.category.toLowerCase()===b.category.toLowerCase();
+  if(catMatch) score += 40;
+
+  const appA = new Set((a.application||[]).map(x=>String(x).toLowerCase()));
+  const appB = new Set((b.application||[]).map(x=>String(x).toLowerCase()));
+  const appOverlap = jaccard(appA, appB);
+  score += 25 * appOverlap;
+
+  const chemMatch = a.chemical_type && b.chemical_type &&
+    String(a.chemical_type).toLowerCase().includes(String(b.chemical_type).toLowerCase().split(' ')[0]) ||
+    (b.chemical_type && a.chemical_type && String(b.chemical_type).toLowerCase().includes(String(a.chemical_type).toLowerCase().split(' ')[0]));
+  if(chemMatch) score += 20;
+
+  const formMatch = a.product_form && b.product_form && a.product_form.toLowerCase()===b.product_form.toLowerCase();
+  if(formMatch) score += 10;
+
+  const dilA = avgPct(a), dilB = avgPct(b);
+  if(dilA!=null && dilB!=null){
+    const diff = Math.abs(dilA-dilB);
+    const sim = Math.max(0, 1 - diff/10); // within 10 pts = scaled similarity
+    score += 5 * sim;
+  } else if(dilA==null && dilB==null){
+    score += 5; // both RTU or both unspecified
+  }
+
+  score = Math.round(score);
+  const tier = score>=70 ? {c:'green',label:'High'} : score>=40 ? {c:'amber',label:'Medium'} : {c:'red',label:'Low'};
+  return { total:score, tier };
+}
+function jaccard(setA,setB){
+  if(!setA.size && !setB.size) return 0;
+  const inter = [...setA].filter(x=>setB.has(x)).length;
+  const union = new Set([...setA,...setB]).size;
+  return union ? inter/union : 0;
+}
+function avgPct(p){
+  const min = parseFloat(p.minimum_dilution_percent), max = parseFloat(p.maximum_dilution_percent);
+  if(!isNaN(min) && !isNaN(max)) return (min+max)/2;
+  return null;
+}
+
+/* =========================================================
+   INIT
+========================================================= */
+refreshKeyStatus();
+refreshDbCount();
+renderDatabase();
+</script>
+</body>
+</html>
