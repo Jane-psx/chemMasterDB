@@ -856,7 +856,12 @@ function parseTabletInfo(text){
 function recomputeRTU(rec){
   // Attempt to parse a numeric price and pack size volume; if not parseable, leave model's values.
   const priceNum = parseFloat(rec.price);
-  if(isNaN(priceNum)) return rec;
+  rec._calc_steps = [];
+
+  if(isNaN(priceNum)){
+    rec._calc_steps.push('No numeric price was found, so RTU cost per gallon/liter could not be calculated.');
+    return rec;
+  }
 
   const minPct = parseFloat(rec.minimum_dilution_percent);
   const maxPct = parseFloat(rec.maximum_dilution_percent);
@@ -876,13 +881,26 @@ function recomputeRTU(rec){
     concGal = (b ? a*b : a) * 0.264172;
   }
 
-  if(rec.dilution_type && /ready to use|rtu/i.test(rec.dilution_type) && concGal){
+  const isRTUtype = rec.dilution_type && /ready to use|rtu/i.test(rec.dilution_type);
+
+  if(concGal){
+    rec._calc_steps.push(`Parsed a container size of ${round(concGal,3)} gal from pack size "${rec.pack_size||''}"${rec.uom?` (unit: ${rec.uom})`:''}.`);
+  }
+
+  if(isRTUtype && concGal){
+    const costPerGal = priceNum/concGal;
+    rec._calc_steps.push(`Product is sold ready-to-use, so no dilution math is needed — the container size is the usable volume.`);
+    rec._calc_steps.push(`Cost/gal = price ÷ container size = $${priceNum.toFixed(2)} ÷ ${round(concGal,3)} gal = $${round(costPerGal,3)}/gal.`);
+    rec._calc_steps.push(`Cost/L = $${round(costPerGal,3)}/gal × 0.264172 gal per L = $${round(costPerGal*0.264172,4)}/L.`);
     rec.rtu_yield_gallons = round(concGal,3);
     rec.rtu_yield_liters = round(concGal/0.264172,3);
-    rec.rtu_cost_per_gallon = round(priceNum/concGal,3);
-    rec.rtu_cost_per_liter = round((priceNum/concGal)*0.264172,4);
-    rec.price_per_unit = rec.price_per_unit ?? round(priceNum/concGal,3);
+    rec.rtu_cost_per_gallon = round(costPerGal,3);
+    rec.rtu_cost_per_liter = round(costPerGal*0.264172,4);
+    rec.price_per_unit = rec.price_per_unit ?? round(costPerGal,3);
     return rec;
+  }
+  if(isRTUtype && !concGal){
+    rec._calc_steps.push(`Product is ready-to-use, but no container volume could be parsed from pack size "${rec.pack_size||'(not stated)'}" — RTU cost per gallon could not be recomputed here.`);
   }
 
   const isSolidDose = rec.product_form && /tablet|solid dose|capsule|caplet|block/i.test(rec.product_form);
@@ -900,34 +918,45 @@ function recomputeRTU(rec){
       const ppu = parseFloat(rec.price_per_unit);
       if(!isNaN(ppu) && ppu > 0 && ppu < priceNum){
         pricePerTablet = ppu;
-        priceBasis = 'used provided price_per_unit as the per-tablet price';
+        priceBasis = `used the provided per-unit price directly: $${round(ppu,3)}/tablet`;
       }else if(count){
         pricePerTablet = priceNum / count;
-        priceBasis = `divided case price by ${count} tablets`;
+        priceBasis = `divided case price by tablet count: $${priceNum.toFixed(2)} ÷ ${count} tablets = $${round(pricePerTablet,3)}/tablet`;
       }else{
         pricePerTablet = priceNum;
-        priceBasis = 'no tablet count found — treated stated price as already being per-tablet (unverified)';
+        priceBasis = `no tablet count found in pack size text — treated the stated price as already being per-tablet: $${round(pricePerTablet,3)}/tablet (unverified)`;
       }
 
       const GRAMS_PER_GALLON = 3785; // approx. mass of 1 gallon of water, density ≈ 1 g/mL
       const avgPct = (minPct + maxPct) / 2;
 
       // solution mass (g) = tablet mass / dilution fraction; yield = solution mass / g-per-gallon
-      const yieldGalAtAvg = (tabletWeightGrams / (avgPct/100)) / GRAMS_PER_GALLON;
+      const solutionMassAvg = tabletWeightGrams / (avgPct/100);
+      const yieldGalAtAvg = solutionMassAvg / GRAMS_PER_GALLON;
       const yieldGalAtMinPct = (tabletWeightGrams / (minPct/100)) / GRAMS_PER_GALLON; // weakest use % -> most yield
       const yieldGalAtMaxPct = (tabletWeightGrams / (maxPct/100)) / GRAMS_PER_GALLON; // strongest use % -> least yield
+      const costPerGalAvg = pricePerTablet / yieldGalAtAvg;
+      const costLow = pricePerTablet/yieldGalAtMinPct, costHigh = pricePerTablet/yieldGalAtMaxPct;
+
+      rec._calc_steps.push(`Parsed tablet weight ≈ ${tabletWeightGrams.toFixed(1)}g${count?` (${count} tablets per case)`:''} from pack size / product text.`);
+      rec._calc_steps.push(`Price per tablet: ${priceBasis}.`);
+      rec._calc_steps.push(`Average dilution % = (${minPct}% + ${maxPct}%) ÷ 2 = ${round(avgPct,3)}%.`);
+      rec._calc_steps.push(`Solution mass at avg dilution = tablet weight ÷ (dilution % ÷ 100) = ${tabletWeightGrams.toFixed(1)}g ÷ ${round(avgPct/100,4)} = ${round(solutionMassAvg,1)}g.`);
+      rec._calc_steps.push(`Yield in gallons = solution mass ÷ 3785 g/gal (water density ≈ 1 g/mL) = ${round(solutionMassAvg,1)}g ÷ 3785 = ${round(yieldGalAtAvg,3)} gal.`);
+      rec._calc_steps.push(`Cost/gal = price per tablet ÷ yield = $${round(pricePerTablet,3)} ÷ ${round(yieldGalAtAvg,3)} gal = $${round(costPerGalAvg,3)}/gal.`);
+      rec._calc_steps.push(`Across the ${minPct}%–${maxPct}% dilution range, yield spans ${round(yieldGalAtMaxPct,3)}–${round(yieldGalAtMinPct,3)} gal, so cost/gal spans $${round(costLow,3)}–$${round(costHigh,3)}.`);
+      rec._calc_steps.push(`Assumes solution density ≈ water (1 g/mL) and dilution % is w/w (tablet mass ÷ total solution mass). Real-world dispensers usually dose by fixed fill volume rather than exact weight-percent, so treat this as an estimate.`);
 
       rec.rtu_yield_gallons = round(yieldGalAtAvg, 3);
       rec.rtu_yield_liters = round(yieldGalAtAvg / 0.264172, 3);
-      rec.rtu_cost_per_gallon = round(pricePerTablet / yieldGalAtAvg, 3);
-      rec.rtu_cost_per_liter = round((pricePerTablet / yieldGalAtAvg) * 0.264172, 4);
+      rec.rtu_cost_per_gallon = round(costPerGalAvg, 3);
+      rec.rtu_cost_per_liter = round(costPerGalAvg * 0.264172, 4);
       rec.price_per_unit = rec.price_per_unit ?? round(pricePerTablet, 3);
       rec._rtu_yield_range_gal = [round(yieldGalAtMaxPct,3), round(yieldGalAtMinPct,3)];
-      rec._rtu_cost_range_gal = [round(pricePerTablet/yieldGalAtMinPct,3), round(pricePerTablet/yieldGalAtMaxPct,3)];
-      rec._solid_dose_note = `Solid-dose calc: ${tabletWeightGrams.toFixed(1)}g/tablet, ${priceBasis}. `
-        + `Assumes solution density ≈ water (1 g/mL) and dilution % is w/w (tablet mass ÷ total solution mass). `
-        + `Real-world dispensers usually dose by fixed fill volume rather than exact weight-percent, so treat this as an estimate.`;
+      rec._rtu_cost_range_gal = [round(costLow,3), round(costHigh,3)];
       return rec;
+    }else{
+      rec._calc_steps.push(`Solid-dose product, but no tablet weight could be parsed from pack size / product name text — RTU cost per gallon could not be recomputed here.`);
     }
   }
 
@@ -936,12 +965,28 @@ function recomputeRTU(rec){
     const yieldGalAtAvg = concGal / (avgPct/100);
     const yieldGalMin = concGal / (maxPct/100); // higher % = less yield
     const yieldGalMax = concGal / (minPct/100); // lower % = more yield
+    const costPerGalAvg = priceNum/yieldGalAtAvg;
+    const costLow = priceNum/yieldGalMax, costHigh = priceNum/yieldGalMin;
+
+    rec._calc_steps.push(`Average dilution % = (${minPct}% + ${maxPct}%) ÷ 2 = ${round(avgPct,3)}%.`);
+    rec._calc_steps.push(`Yield at avg dilution = concentrate volume ÷ (dilution % ÷ 100) = ${round(concGal,3)} gal ÷ ${round(avgPct/100,4)} = ${round(yieldGalAtAvg,2)} gal.`);
+    rec._calc_steps.push(`Cost/gal = price ÷ yield = $${priceNum.toFixed(2)} ÷ ${round(yieldGalAtAvg,2)} gal = $${round(costPerGalAvg,4)}/gal.`);
+    rec._calc_steps.push(`Cost/L = $${round(costPerGalAvg,4)}/gal × 0.264172 gal per L = $${round(costPerGalAvg*0.264172,5)}/L.`);
+    rec._calc_steps.push(`Across the ${minPct}%–${maxPct}% dilution range, yield spans ${round(yieldGalMin,2)}–${round(yieldGalMax,2)} gal (a higher use % means less yield), so cost/gal spans $${round(costLow,4)}–$${round(costHigh,4)}.`);
+
     rec.rtu_yield_gallons = round(yieldGalAtAvg,2);
     rec.rtu_yield_liters = round(yieldGalAtAvg/0.264172,2);
-    rec.rtu_cost_per_gallon = round(priceNum/yieldGalAtAvg,4);
-    rec.rtu_cost_per_liter = round((priceNum/yieldGalAtAvg)*0.264172,5);
+    rec.rtu_cost_per_gallon = round(costPerGalAvg,4);
+    rec.rtu_cost_per_liter = round(costPerGalAvg*0.264172,5);
     rec._rtu_yield_range_gal = [round(yieldGalMin,2), round(yieldGalMax,2)];
-    rec._rtu_cost_range_gal = [round(priceNum/yieldGalMax,4), round(priceNum/yieldGalMin,4)];
+    rec._rtu_cost_range_gal = [round(costLow,4), round(costHigh,4)];
+    return rec;
+  }
+  if(hasPct && !concGal && !isSolidDose){
+    rec._calc_steps.push(`Dilution range ${minPct}%–${maxPct}% was extracted, but no concentrate container volume could be parsed from pack size "${rec.pack_size||'(not stated)'}" — yield and RTU cost could not be recomputed here.`);
+  }
+  if(!hasPct && !isRTUtype){
+    rec._calc_steps.push(`No dilution percentage/ratio or ready-to-use designation was found in the source text, so RTU cost per gallon could not be calculated.`);
   }
   return rec;
 }
@@ -990,9 +1035,13 @@ function renderResult(rec){
         ${kv('Sourced from', rec.sourced_from)}
       </div>
 
-      ${rec._rtu_cost_range_gal ? `<div class="hint" style="margin-top:8px;">Across the stated dilution range, RTU cost spans approximately $${rec._rtu_cost_range_gal[0]} – $${rec._rtu_cost_range_gal[1]} per gallon.</div>` : ''}
-
-      ${rec._solid_dose_note ? `<div class="calc-note"><div class="label">Solid-dose calculation basis</div>${esc(rec._solid_dose_note)}</div>` : ''}
+      ${(rec._calc_steps && rec._calc_steps.length) ? `
+      <div class="calc-note">
+        <div class="label">How the dilution / RTU cost was calculated</div>
+        <ol style="margin:4px 0 0; padding-left:18px;">
+          ${rec._calc_steps.map(s=>`<li style="margin-bottom:4px;">${esc(s)}</li>`).join('')}
+        </ol>
+      </div>` : ''}
 
       <div class="summary-box">
         <div class="label">AI Summary</div>
