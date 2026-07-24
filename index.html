@@ -1828,7 +1828,7 @@ function avgPct(p){
   function autoFillFromName(){
     const name = nameInput.value.trim();
     if(!name) return;
-    const q = name + ' Dilution data for calculation — search, browse, and pull findings from its SDS';
+    const q = name + ' dilution rate';
     queryDirty = false;
     runSearch(q, {auto:true});
   }
