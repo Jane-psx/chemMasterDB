@@ -64,7 +64,7 @@
   nav.tabs button.active{ color:var(--teal-deep); border-bottom-color:var(--teal); }
   nav.tabs button:hover{ color:var(--teal-deep); }
 
-  main{ max-width:1600px; width:95%; margin:0 auto; padding:24px; }
+  main{ max-width:100%; width:100%; margin:0; padding:24px 28px; box-sizing:border-box; }
   .view{ display:none; } .view.active{ display:block; }
 
   h2.section-title{ font-size:16px; margin:0 0 4px; font-weight:650; }
@@ -180,7 +180,7 @@
     display:flex; align-items:flex-start; width:100%;
   }
   .split-left{
-    flex:1 1 auto; min-width:340px; max-width:100%;
+    flex:1 1 49%; width:49%; min-width:300px; max-width:100%;
   }
   .split-divider{
     width:10px; flex:0 0 10px; align-self:stretch; cursor:col-resize; position:relative; margin:0 2px;
@@ -190,7 +190,7 @@
   }
   .split-divider:hover::after, .split-divider.dragging::after{ background:var(--teal); }
   .split-right{
-    flex:0 0 420px; width:420px; min-width:300px; max-width:70vw;
+    flex:1 1 49%; width:49%; min-width:300px; max-width:none;
     position:sticky; top:60px;
     display:flex; flex-direction:column;
     background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow);
@@ -259,34 +259,28 @@
     <div class="split-container" id="splitContainer">
       <div class="split-left" id="splitLeft">
         <div class="panel">
-          <div class="grid2">
-            <div>
-              <div class="field">
-                <label>Product name / identifier (optional)</label>
-                <input type="text" id="inName" placeholder="e.g. Lime-A-Way 4/1gl">
-              </div>
-              <div class="field">
-                <label>SDS / Specification / Manufacturer text</label>
-                <textarea id="inSDS" placeholder="Paste SDS text, product spec sheet, or manufacturer info here…" style="min-height:220px;"></textarea>
-              </div>
-            </div>
-            <div>
-              <div class="field">
-                <label>Pricing / supplier / contract info (optional)</label>
-                <textarea id="inPricing" placeholder="e.g. Price: $42.50/case, Pack size: 4 x 1 gallon, Vendor: Prime Source GPO, Contract #…" style="min-height:120px;"></textarea>
-              </div>
-              <div class="field">
-                <label>Sourced from (optional)</label>
-                <input type="text" id="inSourcedFrom" placeholder="e.g. Prime Source GPO, WellLink, HPSI, Direct from manufacturer">
-                <div class="hint">The specific catalogue/GPO/channel this pricing came from — used to compare the same product across sources in Compare &amp; Match.</div>
-              </div>
-              <div class="field">
-                <label>User notes (optional)</label>
-                <textarea id="inNotes" placeholder="Any additional context, category hints, or comparison targets…" style="min-height:80px;"></textarea>
-              </div>
-              <div class="hint">Fields don't need to be split cleanly — paste everything into the SDS box if that's easier.</div>
-            </div>
+          <div class="field">
+            <label>Product name / identifier (optional)</label>
+            <input type="text" id="inName" placeholder="e.g. Lime-A-Way 4/1gl">
           </div>
+          <div class="field">
+            <label>SDS / Specification / Manufacturer text</label>
+            <textarea id="inSDS" placeholder="Paste SDS text, product spec sheet, or manufacturer info here…" style="min-height:180px;"></textarea>
+          </div>
+          <div class="field">
+            <label>Pricing / supplier / contract info (optional)</label>
+            <textarea id="inPricing" placeholder="e.g. Price: $42.50/case, Pack size: 4 x 1 gallon, Vendor: Prime Source GPO, Contract #…" style="min-height:100px;"></textarea>
+          </div>
+          <div class="field">
+            <label>Sourced from (optional)</label>
+            <input type="text" id="inSourcedFrom" placeholder="e.g. Prime Source GPO, WellLink, HPSI, Direct from manufacturer">
+            <div class="hint">The specific catalogue/GPO/channel this pricing came from — used to compare the same product across sources in Compare &amp; Match.</div>
+          </div>
+          <div class="field">
+            <label>User notes (optional)</label>
+            <textarea id="inNotes" placeholder="Any additional context, category hints, or comparison targets…" style="min-height:70px;"></textarea>
+          </div>
+          <div class="hint">Fields don't need to be split cleanly — paste everything into the SDS box if that's easier.</div>
           <div class="row" style="margin-top:14px;">
             <button class="btn" id="btnAnalyze">Analyze product</button>
             <button class="btn ghost" id="btnClearInputs">Clear</button>
