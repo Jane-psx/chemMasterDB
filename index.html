@@ -174,6 +174,56 @@
   code.inline{ background:var(--panel-alt); padding:1px 6px; border-radius:4px; font-family:var(--mono); font-size:12px; }
   .loader{ display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; vertical-align:-2px; margin-right:7px;}
   @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* ---------- Analyze view: resizable split layout ---------- */
+  .split-container{
+    display:flex; align-items:flex-start; width:100%;
+  }
+  .split-left{
+    flex:1 1 auto; min-width:340px; max-width:100%;
+  }
+  .split-divider{
+    width:10px; flex:0 0 10px; align-self:stretch; cursor:col-resize; position:relative; margin:0 2px;
+  }
+  .split-divider::after{
+    content:''; position:absolute; top:0; bottom:0; left:4px; width:2px; background:var(--border); border-radius:2px;
+  }
+  .split-divider:hover::after, .split-divider.dragging::after{ background:var(--teal); }
+  .split-right{
+    flex:0 0 420px; width:420px; min-width:300px; max-width:70vw;
+    position:sticky; top:60px;
+    display:flex; flex-direction:column;
+    background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow);
+    height:calc(100vh - 108px); min-height:420px; overflow:hidden;
+  }
+  @media (max-width:980px){
+    .split-container{ flex-direction:column; }
+    .split-divider{ display:none; }
+    .split-right{ position:static; width:100%; max-width:100%; flex-basis:auto; height:560px; margin-top:18px; }
+  }
+
+  /* ---------- Embedded mini browser (SDS lookup) ---------- */
+  .browser-toolbar{
+    display:flex; align-items:center; gap:6px; padding:9px 10px; border-bottom:1px solid var(--border); background:var(--panel-alt);
+  }
+  .browser-btn{
+    background:#fff; border:1px solid var(--border); border-radius:6px; width:28px; height:28px; font-size:14px;
+    cursor:pointer; color:var(--ink-soft); display:flex; align-items:center; justify-content:center; flex:0 0 auto; padding:0;
+  }
+  .browser-btn:hover{ background:var(--teal-soft); color:var(--teal-deep); border-color:var(--teal); }
+  .browser-btn:disabled{ opacity:.4; cursor:not-allowed; }
+  .browser-address{
+    flex:1 1 auto; min-width:0; border:1px solid var(--border); border-radius:6px; padding:6px 9px; font-size:12.5px;
+    font-family:var(--sans); background:#fff;
+  }
+  .browser-address:focus{ outline:none; border-color:var(--teal); box-shadow:0 0 0 3px var(--teal-soft); }
+  .browser-subbar{
+    display:flex; align-items:center; justify-content:space-between; gap:10px; padding:6px 10px; font-size:11px;
+    border-bottom:1px solid var(--border); background:#fff; color:var(--ink-faint);
+  }
+  .browser-subbar .link-btn{ font-size:11.5px; white-space:nowrap; }
+  .browser-frame-wrap{ flex:1 1 auto; position:relative; background:#fff; }
+  .browser-frame-wrap iframe{ position:absolute; inset:0; width:100%; height:100%; border:none; }
 </style>
 </head>
 <body>
@@ -206,44 +256,68 @@
     <h2 class="section-title">Analyze a product</h2>
     <p class="section-desc">Paste SDS text, spec sheet content, pricing/contract info, and any notes. The engine extracts a standardized record, computes dilution and RTU cost, and scores it against your database for comparable products.</p>
 
-    <div class="panel">
-      <div class="grid2">
-        <div>
-          <div class="field">
-            <label>Product name / identifier (optional)</label>
-            <input type="text" id="inName" placeholder="e.g. Lime-A-Way 4/1gl">
+    <div class="split-container" id="splitContainer">
+      <div class="split-left" id="splitLeft">
+        <div class="panel">
+          <div class="grid2">
+            <div>
+              <div class="field">
+                <label>Product name / identifier (optional)</label>
+                <input type="text" id="inName" placeholder="e.g. Lime-A-Way 4/1gl">
+              </div>
+              <div class="field">
+                <label>SDS / Specification / Manufacturer text</label>
+                <textarea id="inSDS" placeholder="Paste SDS text, product spec sheet, or manufacturer info here…" style="min-height:220px;"></textarea>
+              </div>
+            </div>
+            <div>
+              <div class="field">
+                <label>Pricing / supplier / contract info (optional)</label>
+                <textarea id="inPricing" placeholder="e.g. Price: $42.50/case, Pack size: 4 x 1 gallon, Vendor: Prime Source GPO, Contract #…" style="min-height:120px;"></textarea>
+              </div>
+              <div class="field">
+                <label>Sourced from (optional)</label>
+                <input type="text" id="inSourcedFrom" placeholder="e.g. Prime Source GPO, WellLink, HPSI, Direct from manufacturer">
+                <div class="hint">The specific catalogue/GPO/channel this pricing came from — used to compare the same product across sources in Compare &amp; Match.</div>
+              </div>
+              <div class="field">
+                <label>User notes (optional)</label>
+                <textarea id="inNotes" placeholder="Any additional context, category hints, or comparison targets…" style="min-height:80px;"></textarea>
+              </div>
+              <div class="hint">Fields don't need to be split cleanly — paste everything into the SDS box if that's easier.</div>
+            </div>
           </div>
-          <div class="field">
-            <label>SDS / Specification / Manufacturer text</label>
-            <textarea id="inSDS" placeholder="Paste SDS text, product spec sheet, or manufacturer info here…" style="min-height:220px;"></textarea>
+          <div class="row" style="margin-top:14px;">
+            <button class="btn" id="btnAnalyze">Analyze product</button>
+            <button class="btn ghost" id="btnClearInputs">Clear</button>
+            <div class="spacer"></div>
+            <span id="analyzeMsg" class="hint"></span>
           </div>
         </div>
-        <div>
-          <div class="field">
-            <label>Pricing / supplier / contract info (optional)</label>
-            <textarea id="inPricing" placeholder="e.g. Price: $42.50/case, Pack size: 4 x 1 gallon, Vendor: Prime Source GPO, Contract #…" style="min-height:120px;"></textarea>
-          </div>
-          <div class="field">
-            <label>Sourced from (optional)</label>
-            <input type="text" id="inSourcedFrom" placeholder="e.g. Prime Source GPO, WellLink, HPSI, Direct from manufacturer">
-            <div class="hint">The specific catalogue/GPO/channel this pricing came from — used to compare the same product across sources in Compare &amp; Match.</div>
-          </div>
-          <div class="field">
-            <label>User notes (optional)</label>
-            <textarea id="inNotes" placeholder="Any additional context, category hints, or comparison targets…" style="min-height:80px;"></textarea>
-          </div>
-          <div class="hint">Fields don't need to be split cleanly — paste everything into the SDS box if that's easier.</div>
-        </div>
+
+        <div id="resultWrap" style="margin-top:20px; display:none;"></div>
       </div>
-      <div class="row" style="margin-top:14px;">
-        <button class="btn" id="btnAnalyze">Analyze product</button>
-        <button class="btn ghost" id="btnClearInputs">Clear</button>
-        <div class="spacer"></div>
-        <span id="analyzeMsg" class="hint"></span>
+
+      <div class="split-divider" id="splitDivider" title="Drag to resize"></div>
+
+      <div class="split-right" id="splitRight">
+        <div class="browser-toolbar">
+          <button class="browser-btn" id="browserBack" title="Back" disabled>&larr;</button>
+          <button class="browser-btn" id="browserForward" title="Forward" disabled>&rarr;</button>
+          <button class="browser-btn" id="browserRefresh" title="Refresh">&#8635;</button>
+          <input type="text" id="browserQuery" class="browser-address" placeholder="Search Google…">
+          <button class="btn small" id="browserGo">Go</button>
+          <button class="btn ghost small" id="browserSync" title="Refill query from the product name field">&#8635; Name</button>
+        </div>
+        <div class="browser-subbar">
+          <span id="browserStatus">Type a product name to auto-search its SDS.</span>
+          <a href="https://www.google.com/search?q=SDS" id="browserOpenNewTab" class="link-btn" target="_blank" rel="noopener">Open in new tab &#8599;</a>
+        </div>
+        <div class="browser-frame-wrap">
+          <iframe id="browserFrame" title="Embedded SDS search browser" referrerpolicy="no-referrer"></iframe>
+        </div>
       </div>
     </div>
-
-    <div id="resultWrap" style="margin-top:20px; display:none;"></div>
   </div>
 
   <!-- ================= DATABASE ================= -->
@@ -1381,6 +1455,133 @@ function avgPct(p){
   if(!isNaN(min) && !isNaN(max)) return (min+max)/2;
   return null;
 }
+
+/* =========================================================
+   MINI BROWSER (Analyze view — dedicated Google search panel)
+   Note: Google sends security headers that normally block being
+   framed by another site. The "igu=1" param is Google's own flag
+   for approved embedded-search contexts and is the standard way
+   to get results to render inside an iframe. It can still fail if
+   Google changes behavior — "Open in new tab" is always available
+   as a reliable fallback.
+========================================================= */
+(function(){
+  const frame = document.getElementById('browserFrame');
+  const queryInput = document.getElementById('browserQuery');
+  const btnGo = document.getElementById('browserGo');
+  const btnBack = document.getElementById('browserBack');
+  const btnForward = document.getElementById('browserForward');
+  const btnRefresh = document.getElementById('browserRefresh');
+  const btnSync = document.getElementById('browserSync');
+  const statusEl = document.getElementById('browserStatus');
+  const openNewTab = document.getElementById('browserOpenNewTab');
+  const nameInput = document.getElementById('inName');
+
+  let lastLoadedUrl = null;
+  let queryDirty = false; // becomes true once the user hand-edits the search box
+
+  function buildGoogleUrl(q){
+    return 'https://www.google.com/search?igu=1&q=' + encodeURIComponent(q);
+  }
+
+  function runSearch(q, opts){
+    opts = opts || {};
+    q = String(q||'').trim();
+    if(!q) return;
+    queryInput.value = q;
+    const url = buildGoogleUrl(q);
+    frame.src = url;
+    lastLoadedUrl = url;
+    openNewTab.href = 'https://www.google.com/search?q=' + encodeURIComponent(q);
+    statusEl.textContent = (opts.auto ? 'Auto-searching: ' : 'Searching: ') + '"' + q + '"';
+    btnBack.disabled = false;
+    btnForward.disabled = false;
+  }
+
+  function autoFillFromName(){
+    const name = nameInput.value.trim();
+    if(!name) return;
+    const q = name + ' SDS';
+    queryDirty = false;
+    runSearch(q, {auto:true});
+  }
+
+  // Auto-search as the product name is typed, unless the user has manually
+  // edited the search box (in which case we don't want to clobber it).
+  let nameDebounce = null;
+  nameInput.addEventListener('input', ()=>{
+    if(queryDirty) return;
+    clearTimeout(nameDebounce);
+    nameDebounce = setTimeout(autoFillFromName, 600);
+  });
+
+  queryInput.addEventListener('input', ()=>{ queryDirty = true; });
+  queryInput.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter'){ e.preventDefault(); queryDirty = true; runSearch(queryInput.value); }
+  });
+  btnGo.addEventListener('click', ()=>{ queryDirty = true; runSearch(queryInput.value); });
+  btnSync.addEventListener('click', ()=>{
+    if(!nameInput.value.trim()){ statusEl.textContent = 'Enter a product name first.'; return; }
+    autoFillFromName();
+  });
+
+  // Cross-origin frames still accept navigation commands (back/forward/go) —
+  // browsers allow this even though the parent page can't read the frame's
+  // current URL, so these work for pages the user clicked to from search results.
+  btnBack.addEventListener('click', ()=>{
+    try{ frame.contentWindow.history.back(); }catch(e){}
+  });
+  btnForward.addEventListener('click', ()=>{
+    try{ frame.contentWindow.history.forward(); }catch(e){}
+  });
+  btnRefresh.addEventListener('click', ()=>{
+    try{ frame.contentWindow.location.reload(); }
+    catch(e){ if(lastLoadedUrl) frame.src = lastLoadedUrl; }
+  });
+
+  // Seed the panel if a product name is already filled in.
+  if(nameInput.value.trim()) autoFillFromName();
+})();
+
+/* ---------- Resizable split divider ---------- */
+(function(){
+  const container = document.getElementById('splitContainer');
+  const right = document.getElementById('splitRight');
+  const divider = document.getElementById('splitDivider');
+  if(!container || !divider || !right) return;
+
+  const STORAGE_KEY = 'cpie_split_right_width';
+  const saved = parseInt(localStorage.getItem(STORAGE_KEY), 10);
+  if(!isNaN(saved) && saved>280 && saved<1200){
+    right.style.flexBasis = saved+'px';
+    right.style.width = saved+'px';
+  }
+
+  let dragging = false;
+  divider.addEventListener('mousedown', (e)=>{
+    dragging = true;
+    divider.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', (e)=>{
+    if(!dragging) return;
+    const rect = container.getBoundingClientRect();
+    let newRightWidth = rect.right - e.clientX;
+    const min = 300, max = Math.min(900, rect.width - 340);
+    newRightWidth = Math.max(min, Math.min(max, newRightWidth));
+    right.style.flexBasis = newRightWidth + 'px';
+    right.style.width = newRightWidth + 'px';
+  });
+  window.addEventListener('mouseup', ()=>{
+    if(!dragging) return;
+    dragging = false;
+    divider.classList.remove('dragging');
+    document.body.style.userSelect = '';
+    const w = parseInt(right.style.width, 10);
+    if(w) localStorage.setItem(STORAGE_KEY, w);
+  });
+})();
 
 /* =========================================================
    INIT
