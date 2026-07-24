@@ -479,10 +479,38 @@ Warewashing Delimer, Machine Delimer, Scale Dissolver.
 
 PRODUCT FORM: Tablet, Block, Powder, Liquid, Capsule, Solid Dose, Granular, Concentrate, Ready To Use, Foam.
 
-DILUTION: search for dilution ratio / use dilution / recommended concentration / working solution language
-(e.g. "0.7%-4%", "1:64", "1 oz per gallon", "30 ml/L"). Convert to percentage AND ratio where possible, and
-note minimum/maximum. If the product is sold ready-to-use, dilution_type should reflect that and dilution
-percent/ratio fields should be null.
+DILUTION EXTRACTION RULES (VERY IMPORTANT): a product's source text may contain multiple concentration
+values (manufacturer mixing instructions, dispenser settings, AND a separate SDS "at use concentration"
+statement). Extract dilution_type, minimum_dilution_ratio, maximum_dilution_ratio,
+minimum_dilution_percent, and maximum_dilution_percent using this strict priority order — do not blend or
+average values from different priority tiers:
+
+PRIORITY 1 — Manufacturer / label / use instructions. If the document states any explicit use dilution such
+as "1:64", "1:128", "2 oz per gallon", "30 mL/L", "add 1 cap per bucket", a dispenser setting, or a named
+dispensing system (QC, Oasis, J-Fill, Topmatic, etc.), this IS the recommended use dilution. Populate
+minimum_dilution_ratio and maximum_dilution_ratio with this exact value, then convert it to a percentage
+using percent = 100 / N for a ratio of 1:N (e.g. 1:128 → 100/128 = 0.78125%). When the manufacturer gives a
+single fixed dilution (not a range), set minimum_dilution_percent and maximum_dilution_percent to the SAME
+converted value — do not average or spread it into a range.
+
+PRIORITY 2 — Manufacturer recommended range. If the manufacturer explicitly gives a range, such as
+"1:64–1:256" or "0.25%–1%", populate minimum and maximum from that range (converting ratios to percentages
+with the same 100/N formula per endpoint).
+
+PRIORITY 3 — SDS "at use concentration". Many SDS documents separately state something like "At use
+concentration: 0.2–0.8%". This value is NOT the preferred dilution when a manufacturer use dilution or
+mixing ratio exists anywhere in the source text. Use the SDS at-use concentration ONLY when no explicit
+manufacturer dilution ratio, mixing instruction, or dispenser setting is found anywhere in the source text.
+
+If both a manufacturer dilution AND an SDS at-use concentration are present, the manufacturer dilution always
+wins and the SDS range is ignored entirely for minimum_dilution_percent/maximum_dilution_percent and for RTU
+calculations — never average the two. For example, given a manufacturer dilution of "1:128" and an SDS
+at-use concentration of "0.2–0.8%", the correct extraction is minimum_dilution_ratio = "1:128",
+maximum_dilution_ratio = "1:128", minimum_dilution_percent = 0.78125, maximum_dilution_percent = 0.78125 —
+the SDS 0.2–0.8% range is disregarded.
+
+If the product is sold ready-to-use, dilution_type should reflect that and dilution percent/ratio fields
+should be null.
 
 RTU CALCULATIONS: if pricing is available, calculate cost per ounce/liter/gallon. If dilution data is also
 available, calculate RTU yield (liters and gallons) and RTU cost per liter/gallon at the given dilution. For
@@ -601,6 +629,54 @@ Pricing info: 40 tablets per case, case price $96.00. Supplier: Prime Source GPO
     match_keywords: ["delimer","tablet","solid dose","scale removal","warewashing"],
     confidence_score: 92,
     ai_summary: "Monogram Clean Force Delimer is a concentrated acid-based solid-dose tablet delimer for scale removal in warewashing applications, with a recommended dilution of 0.7%-4.0%. At the minimum dilution, RTU cost runs a small fraction of a cent per gallon, making it dramatically cheaper per gallon than a ready-to-use liquid delimer like Lime-A-Way — a strong cost-saving opportunity when converting facilities from RTU liquid to solid dose."
+  }) },
+  { role:'user', content:
+`Product name : TOPMATIC ALL PURPOSE NEUTRAL CLEANER
+Recommended use : General purpose hard surface cleaner, dilute with J-Fill dispensing system.
+Directions for use : Fill dispenser bottle using J-Fill station set to 1:128. Do not use undiluted.
+Section 8 (SDS) — Exposure controls / personal protection:
+  At use concentration: 0.2 - 0.8%
+Company : Diversey Inc.
+Issuing date : 03/02/2021
+Pricing info: 2 x 2.5 gallon case, case price $64.00. Supplier: Prime Source GPO.` },
+  { role:'assistant', content: JSON.stringify({
+    product_id: "TOPMATIC-APC-2X2.5GL",
+    product_name: "Topmatic All Purpose Neutral Cleaner",
+    brand: "Topmatic",
+    manufacturer: "Diversey Inc.",
+    category: "All Purpose Cleaner",
+    subcategory: "Neutral Cleaner",
+    product_form: "Concentrate",
+    chemical_type: "Neutral-based",
+    application: ["General hard surface cleaning"],
+    recommended_use: "General purpose hard surface cleaner, dilute with J-Fill dispensing system.",
+    restrictions_on_use: "Do not use undiluted.",
+    dilution_type: "Fixed dispenser dilution ratio",
+    minimum_dilution_percent: 0.78125,
+    maximum_dilution_percent: 0.78125,
+    minimum_dilution_ratio: "1:128",
+    maximum_dilution_ratio: "1:128",
+    rtu_yield_liters: 2422.66,
+    rtu_yield_gallons: 640,
+    pack_size: "2 x 2.5 gallon",
+    uom: "case",
+    price: 64.00,
+    price_per_unit: 32.00,
+    rtu_cost_per_liter: 0.0264,
+    rtu_cost_per_gallon: 0.1,
+    hazard_classification: "Not specified in excerpt",
+    ppe_required: [],
+    green_certifications: [],
+    epa_registered: null,
+    contract_vendor: "Prime Source GPO",
+    supplier: "Prime Source GPO",
+    sourced_from: "Prime Source GPO",
+    tags: ["All Purpose Cleaner","Neutral Cleaner","Dispenser Dilution","Concentrate","J-Fill","Cost Saving Opportunity"],
+    comparable_categories: ["All Purpose Cleaner","Neutral Cleaner"],
+    comparable_products: ["Diversey Stride","Spartan HDQ Neutral"],
+    match_keywords: ["all purpose cleaner","neutral cleaner","j-fill","1:128","dispenser"],
+    confidence_score: 96,
+    ai_summary: "Topmatic All Purpose Neutral Cleaner is a J-Fill dispenser-diluted concentrate with a fixed 1:128 use dilution (0.78125%), per the manufacturer's mixing instructions — this takes priority over the SDS's separate 0.2-0.8% at-use concentration range, which is ignored here. At a case price of $64.00 for 5 gallons of concentrate, RTU cost runs about $0.10/gallon."
   }) }
 ];
 
