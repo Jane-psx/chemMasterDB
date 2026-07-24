@@ -231,6 +231,15 @@
   .browser-subbar .link-btn{ font-size:11.5px; white-space:nowrap; }
   .browser-frame-wrap{ flex:1 1 auto; position:relative; background:#fff; }
   .browser-frame-wrap iframe{ position:absolute; inset:0; width:100%; height:100%; border:none; }
+  .browser-panel-title{
+    padding:10px 12px 0; font-weight:650; font-size:13px; color:var(--ink);
+  }
+  .browser-panel-title .sub{ font-weight:500; font-size:11px; color:var(--ink-faint); margin-top:1px; }
+  .browser-capture{
+    flex:0 0 auto; padding:10px 12px; border-top:1px solid var(--border); background:var(--panel-alt);
+  }
+  .browser-capture textarea{ min-height:52px; font-family:var(--sans); font-size:12px; }
+  .browser-capture .hint{ margin:0 0 5px; }
 </style>
 </head>
 <body>
@@ -271,12 +280,17 @@
             <input type="text" id="inName" placeholder="e.g. Lime-A-Way 4/1gl">
           </div>
           <div class="field">
+            <label>Price ($)</label>
+            <input type="number" id="inPrice" step="0.01" min="0" placeholder="e.g. 21.64">
+            <div class="hint">Just the number — no need to type "Price: $" in the box below anymore.</div>
+          </div>
+          <div class="field">
             <label>SDS / Specification / Manufacturer text</label>
             <textarea id="inSDS" placeholder="Paste SDS text, product spec sheet, or manufacturer info here…" style="min-height:180px;"></textarea>
           </div>
           <div class="field">
             <label>Pricing / supplier / contract info (optional)</label>
-            <textarea id="inPricing" placeholder="e.g. Price: $42.50/case, Pack size: 4 x 1 gallon, Vendor: Prime Source GPO, Contract #…" style="min-height:100px;"></textarea>
+            <textarea id="inPricing" placeholder="e.g. Pack size: 4 x 1 gallon, Vendor: Prime Source GPO, Contract #…" style="min-height:100px;"></textarea>
           </div>
           <div class="field">
             <label>Sourced from (optional)</label>
@@ -302,6 +316,10 @@
       <div class="split-divider" id="splitDivider" title="Drag to resize"></div>
 
       <div class="split-right" id="splitRight">
+        <div class="browser-panel-title">
+          Product Details
+          <div class="sub">Dilution data for calculation — search, browse, and pull findings into the SDS field</div>
+        </div>
         <div class="browser-toolbar">
           <button class="browser-btn" id="browserBack" title="Back" disabled>&larr;</button>
           <button class="browser-btn" id="browserForward" title="Forward" disabled>&rarr;</button>
@@ -316,6 +334,16 @@
         </div>
         <div class="browser-frame-wrap">
           <iframe id="browserFrame" title="Embedded SDS search browser" referrerpolicy="no-referrer"></iframe>
+        </div>
+        <div class="browser-capture">
+          <div class="hint">Select and copy the dilution ratio, use instructions, or pack size from the page above, then bring it in:</div>
+          <textarea id="browserCapture" placeholder="Paste copied text here…"></textarea>
+          <div class="row" style="margin-top:6px;">
+            <button class="btn small" id="btnInsertCapture">Add to SDS field</button>
+            <button class="btn ghost small" id="btnClipboardCapture" title="Try to read your clipboard directly">Paste from clipboard</button>
+            <div class="spacer"></div>
+            <span class="hint" id="captureStatus"></span>
+          </div>
         </div>
       </div>
     </div>
@@ -820,6 +848,7 @@ async function callGroq(messages, jsonMode){
 ========================================================= */
 document.getElementById('btnClearInputs').addEventListener('click', ()=>{
   document.getElementById('inName').value='';
+  document.getElementById('inPrice').value='';
   document.getElementById('inSDS').value='';
   document.getElementById('inPricing').value='';
   document.getElementById('inSourcedFrom').value='';
@@ -830,12 +859,13 @@ document.getElementById('btnAnalyze').addEventListener('click', analyzeProduct);
 
 async function analyzeProduct(){
   const name = document.getElementById('inName').value.trim();
+  const priceVal = document.getElementById('inPrice').value.trim();
   const sds = document.getElementById('inSDS').value.trim();
   const pricing = document.getElementById('inPricing').value.trim();
   const sourcedFrom = document.getElementById('inSourcedFrom').value.trim();
   const notes = document.getElementById('inNotes').value.trim();
 
-  if(!sds && !pricing && !notes){
+  if(!sds && !pricing && !notes && !priceVal){
     toast('Paste some product information first.');
     return;
   }
@@ -850,6 +880,7 @@ async function analyzeProduct(){
 
   let userContent = '';
   if(name) userContent += `Product name (as given by user): ${name}\n\n`;
+  if(priceVal) userContent += `Price (as given by user): $${priceVal}\n\n`;
   if(sds) userContent += `SDS / Specification / Manufacturer text:\n${sds}\n\n`;
   if(pricing) userContent += `Pricing / supplier / contract info:\n${pricing}\n\n`;
   if(sourcedFrom) userContent += `Sourced from (as given by user): ${sourcedFrom}\n\n`;
@@ -867,6 +898,7 @@ async function analyzeProduct(){
     if(!parsed) throw new Error('Model did not return valid JSON.');
     parsed = normalizeRecord(parsed);
     if(name) parsed.product_name = name; // user-supplied name is authoritative — never let the model rename it
+    if(priceVal) parsed.price = parseFloat(priceVal); // user-supplied price is authoritative — no parsing ambiguity
     if(sourcedFrom) parsed.sourced_from = sourcedFrom; // user-supplied source is authoritative for savings comparisons
     parsed = recomputeRTU(parsed);
     if(!parsed.product_id) parsed.product_id = makeId(parsed.product_name || name || 'product');
@@ -1761,6 +1793,31 @@ function avgPct(p){
   btnRefresh.addEventListener('click', ()=>{
     try{ frame.contentWindow.location.reload(); }
     catch(e){ if(lastLoadedUrl) frame.src = lastLoadedUrl; }
+  });
+
+  // Copy-paste bridge into the SDS field. The iframe's content is cross-origin (Google),
+  // so this page cannot read into it directly — the user copies text from the rendered
+  // page themselves, and this just makes getting it into the SDS field a single click.
+  const captureBox = document.getElementById('browserCapture');
+  const captureStatus = document.getElementById('captureStatus');
+  document.getElementById('btnInsertCapture').addEventListener('click', ()=>{
+    const text = captureBox.value.trim();
+    if(!text){ captureStatus.textContent = 'Paste something first.'; return; }
+    const sds = document.getElementById('inSDS');
+    sds.value = sds.value.trim() ? (sds.value.trimEnd() + '\n\n' + text) : text;
+    captureBox.value = '';
+    captureStatus.textContent = 'Added to SDS field.';
+    setTimeout(()=>{ captureStatus.textContent = ''; }, 2500);
+  });
+  document.getElementById('btnClipboardCapture').addEventListener('click', async ()=>{
+    try{
+      const text = await navigator.clipboard.readText();
+      if(!text){ captureStatus.textContent = 'Clipboard is empty.'; return; }
+      captureBox.value = text;
+      captureStatus.textContent = 'Pasted — review, then click "Add to SDS field".';
+    }catch(e){
+      captureStatus.textContent = 'Clipboard access blocked by the browser — paste manually (Ctrl/Cmd+V) instead.';
+    }
   });
 
   // Seed the panel if a product name is already filled in.
