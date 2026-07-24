@@ -232,9 +232,12 @@
   .browser-frame-wrap{ flex:1 1 auto; position:relative; background:#fff; }
   .browser-frame-wrap iframe{ position:absolute; inset:0; width:100%; height:100%; border:none; }
   .browser-panel-title{
-    padding:10px 12px 0; font-weight:650; font-size:13px; color:var(--ink);
+    padding:10px 12px 4px; background:var(--panel-alt); border-bottom:1px solid var(--border);
   }
-  .browser-panel-title .sub{ font-weight:500; font-size:11px; color:var(--ink-faint); margin-top:1px; }
+  .browser-field-label{
+    display:block; font-size:12px; font-weight:650; text-transform:none; letter-spacing:normal;
+    color:var(--ink); margin-bottom:0; line-height:1.4;
+  }
   .browser-capture{
     flex:0 0 auto; padding:10px 12px; border-top:1px solid var(--border); background:var(--panel-alt);
   }
@@ -317,19 +320,18 @@
 
       <div class="split-right" id="splitRight">
         <div class="browser-panel-title">
-          Product Details
-          <div class="sub">Dilution data for calculation — search, browse, and pull findings into the SDS field</div>
+          <label for="browserQuery" class="browser-field-label">Dilution data for calculation — search, browse, and pull findings into the SDS field.</label>
         </div>
         <div class="browser-toolbar">
           <button class="browser-btn" id="browserBack" title="Back" disabled>&larr;</button>
           <button class="browser-btn" id="browserForward" title="Forward" disabled>&rarr;</button>
           <button class="browser-btn" id="browserRefresh" title="Refresh">&#8635;</button>
-          <input type="text" id="browserQuery" class="browser-address" placeholder="Dilution data for calculation — search, browse, and pull findings into the SDS field.">
+          <input type="text" id="browserQuery" class="browser-address" placeholder="Search Google…">
           <button class="btn small" id="browserGo">Go</button>
           <button class="btn ghost small" id="browserSync" title="Refill query from the product name field">&#8635; Name</button>
         </div>
         <div class="browser-subbar">
-          <span id="browserStatus">Dilution data for calculation — search, browse, and pull findings into the SDS field.</span>
+          <span id="browserStatus">Type a product name to auto-search its SDS.</span>
           <a href="https://www.google.com/search?q=SDS" id="browserOpenNewTab" class="link-btn" target="_blank" rel="noopener">Open in new tab &#8599;</a>
         </div>
         <div class="browser-frame-wrap">
