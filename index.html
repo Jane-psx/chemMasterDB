@@ -1830,8 +1830,11 @@ function avgPct(p){
     const name = nameInput.value.trim();
     if(!name) return;
     const priceVal = priceInput.value.trim();
-    const priceText = priceVal ? ` $${priceVal}` : '';
-    const q = name + priceText + ' dilution rate';
+    const parts = [name];
+    if(priceVal) parts.push(`$${priceVal}`);
+    parts.push('dilution rate');
+    parts.push('rtu/gal');
+    const q = parts.join(' | ');
     queryDirty = false;
     runSearch(q, {auto:true});
   }
