@@ -135,6 +135,13 @@
   }
   .calc-note .label{ font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; font-weight:700; margin-bottom:5px; opacity:.85;}
 
+  .confirm-block{
+    background:var(--red-soft); border:1px solid #e3b8b8; border-radius:6px; padding:14px 16px; margin-top:16px;
+  }
+  .confirm-block .label{ font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; font-weight:700; margin-bottom:6px; color:var(--red); }
+  .confirm-block p{ margin:0; font-size:12.5px; line-height:1.6; color:var(--ink); }
+  .confirm-block input[type=number]{ max-width:140px; }
+
   /* ---------- Table ---------- */
   table{ width:100%; border-collapse:collapse; font-size:12.5px; table-layout:auto; }
   th{ text-align:left; padding:9px 10px; background:var(--panel-alt); color:var(--ink-faint); font-size:10.5px;
@@ -488,14 +495,23 @@ average values from different priority tiers:
 PRIORITY 1 — Manufacturer / label / use instructions. If the document states any explicit use dilution such
 as "1:64", "1:128", "2 oz per gallon", "30 mL/L", "add 1 cap per bucket", a dispenser setting, or a named
 dispensing system (QC, Oasis, J-Fill, Topmatic, etc.), this IS the recommended use dilution. Populate
-minimum_dilution_ratio and maximum_dilution_ratio with this exact value, then convert it to a percentage
-using percent = 100 / N for a ratio of 1:N (e.g. 1:128 → 100/128 = 0.78125%). When the manufacturer gives a
+minimum_dilution_ratio and maximum_dilution_ratio with this exact value, then convert it to a percentage.
+
+A dilution ratio "1:N" means 1 part concentrate to N parts water — N+1 total parts — so the correct
+conversion is percent = 100 / (N + 1), NOT 100/N. For example, 1:128 → 100/129 = 0.775%, and 1:3 →
+100/4 = 25%. This matters most at low ratios (1:1 through roughly 1:10, common for degreasers and floor
+strippers), where using 100/N instead of 100/(N+1) overstates the concentration by 20-100%; at high ratios
+(1:64 and above, common for general-purpose cleaners and sanitizers) the two formulas differ by under 2%,
+but always use 100/(N+1) for consistency. For an "X per Y" phrasing that names both quantities directly
+(e.g. "2 oz per gallon of water", "30 mL per liter of water"), compute percent the same way: concentrate
+amount ÷ (concentrate amount + water amount) × 100, converting both to the same unit first — do not treat
+the stated water amount as if it were already the total solution volume. When the manufacturer gives a
 single fixed dilution (not a range), set minimum_dilution_percent and maximum_dilution_percent to the SAME
 converted value — do not average or spread it into a range.
 
 PRIORITY 2 — Manufacturer recommended range. If the manufacturer explicitly gives a range, such as
 "1:64–1:256" or "0.25%–1%", populate minimum and maximum from that range (converting ratios to percentages
-with the same 100/N formula per endpoint).
+with the same 100/(N+1) formula per endpoint).
 
 PRIORITY 3 — SDS "at use concentration". Many SDS documents separately state something like "At use
 concentration: 0.2–0.8%". This value is NOT the preferred dilution when a manufacturer use dilution or
@@ -506,7 +522,7 @@ If both a manufacturer dilution AND an SDS at-use concentration are present, the
 wins and the SDS range is ignored entirely for minimum_dilution_percent/maximum_dilution_percent and for RTU
 calculations — never average the two. For example, given a manufacturer dilution of "1:128" and an SDS
 at-use concentration of "0.2–0.8%", the correct extraction is minimum_dilution_ratio = "1:128",
-maximum_dilution_ratio = "1:128", minimum_dilution_percent = 0.78125, maximum_dilution_percent = 0.78125 —
+maximum_dilution_ratio = "1:128", minimum_dilution_percent = 0.775, maximum_dilution_percent = 0.775 —
 the SDS 0.2–0.8% range is disregarded.
 
 If the product is sold ready-to-use, dilution_type should reflect that and dilution percent/ratio fields
@@ -652,18 +668,18 @@ Pricing info: 2 x 2.5 gallon case, case price $64.00. Supplier: Prime Source GPO
     recommended_use: "General purpose hard surface cleaner, dilute with J-Fill dispensing system.",
     restrictions_on_use: "Do not use undiluted.",
     dilution_type: "Fixed dispenser dilution ratio",
-    minimum_dilution_percent: 0.78125,
-    maximum_dilution_percent: 0.78125,
+    minimum_dilution_percent: 0.775,
+    maximum_dilution_percent: 0.775,
     minimum_dilution_ratio: "1:128",
     maximum_dilution_ratio: "1:128",
-    rtu_yield_liters: 2422.66,
-    rtu_yield_gallons: 640,
+    rtu_yield_liters: 2441.59,
+    rtu_yield_gallons: 645,
     pack_size: "2 x 2.5 gallon",
     uom: "case",
     price: 64.00,
     price_per_unit: 32.00,
-    rtu_cost_per_liter: 0.0264,
-    rtu_cost_per_gallon: 0.1,
+    rtu_cost_per_liter: 0.0262,
+    rtu_cost_per_gallon: 0.0992,
     hazard_classification: "Not specified in excerpt",
     ppe_required: [],
     green_certifications: [],
@@ -676,7 +692,7 @@ Pricing info: 2 x 2.5 gallon case, case price $64.00. Supplier: Prime Source GPO
     comparable_products: ["Diversey Stride","Spartan HDQ Neutral"],
     match_keywords: ["all purpose cleaner","neutral cleaner","j-fill","1:128","dispenser"],
     confidence_score: 96,
-    ai_summary: "Topmatic All Purpose Neutral Cleaner is a J-Fill dispenser-diluted concentrate with a fixed 1:128 use dilution (0.78125%), per the manufacturer's mixing instructions — this takes priority over the SDS's separate 0.2-0.8% at-use concentration range, which is ignored here. At a case price of $64.00 for 5 gallons of concentrate, RTU cost runs about $0.10/gallon."
+    ai_summary: "Topmatic All Purpose Neutral Cleaner is a J-Fill dispenser-diluted concentrate with a fixed 1:128 use dilution (0.775%, i.e. 1 part concentrate to 128 parts water), per the manufacturer's mixing instructions — this takes priority over the SDS's separate 0.2-0.8% at-use concentration range, which is ignored here. At a case price of $64.00 for 5 gallons of concentrate, RTU cost runs about $0.10/gallon."
   }) }
 ];
 
@@ -985,22 +1001,37 @@ function recomputeRTU(rec){
   if(!concGal && isSolidDose && hasPct){
     const { count, tabletWeightGrams } = parseTabletInfo(`${rec.pack_size||''} ${rec.product_name||''} ${rec.brand||''}`);
 
+    if(tabletWeightGrams && !count){
+      // We know the tablet's weight but not how many tablets the stated price covers —
+      // dividing incorrectly here can be off by 10-40x (a single-tablet price vs. a
+      // full-case price look identical in the source text). Rather than guess, withhold
+      // the RTU numbers and ask the user to confirm the tablet count.
+      rec._tablet_count_unconfirmed = true;
+      rec._tablet_weight_g = tabletWeightGrams;
+      rec.rtu_yield_gallons = null;
+      rec.rtu_yield_liters = null;
+      rec.rtu_cost_per_gallon = null;
+      rec.rtu_cost_per_liter = null;
+      delete rec._rtu_yield_range_gal;
+      delete rec._rtu_cost_range_gal;
+      rec._calc_steps.push(`Parsed tablet weight ≈ ${tabletWeightGrams.toFixed(1)}g from pack size / product text, but no tablet count per case was found — `
+        + `$${priceNum.toFixed(2)} could be a per-tablet price or a full case price, and those give wildly different RTU costs. `
+        + `RTU cost was NOT calculated to avoid showing a misleading number — enter the tablet count below to complete the calculation.`);
+      return rec;
+    }
+
     if(tabletWeightGrams){
       // Price per tablet: prefer an explicit price_per_unit that's clearly a per-tablet
-      // figure (smaller than the total price); otherwise divide case price by tablet count;
-      // otherwise fall back to treating price as already being per-tablet.
+      // figure (smaller than the total price); otherwise divide case price by tablet count.
       let pricePerTablet = null;
       let priceBasis = '';
       const ppu = parseFloat(rec.price_per_unit);
       if(!isNaN(ppu) && ppu > 0 && ppu < priceNum){
         pricePerTablet = ppu;
         priceBasis = `used the provided per-unit price directly: $${round(ppu,3)}/tablet`;
-      }else if(count){
+      }else{
         pricePerTablet = priceNum / count;
         priceBasis = `divided case price by tablet count: $${priceNum.toFixed(2)} ÷ ${count} tablets = $${round(pricePerTablet,3)}/tablet`;
-      }else{
-        pricePerTablet = priceNum;
-        priceBasis = `no tablet count found in pack size text — treated the stated price as already being per-tablet: $${round(pricePerTablet,3)}/tablet (unverified)`;
       }
 
       const GRAMS_PER_GALLON = 3785; // approx. mass of 1 gallon of water, density ≈ 1 g/mL
@@ -1014,7 +1045,7 @@ function recomputeRTU(rec){
       const costPerGalAvg = pricePerTablet / yieldGalAtAvg;
       const costLow = pricePerTablet/yieldGalAtMinPct, costHigh = pricePerTablet/yieldGalAtMaxPct;
 
-      rec._calc_steps.push(`Parsed tablet weight ≈ ${tabletWeightGrams.toFixed(1)}g${count?` (${count} tablets per case)`:''} from pack size / product text.`);
+      rec._calc_steps.push(`Parsed tablet weight ≈ ${tabletWeightGrams.toFixed(1)}g (${count} tablets per case) from pack size / product text.`);
       rec._calc_steps.push(`Price per tablet: ${priceBasis}.`);
       rec._calc_steps.push(`Average dilution % = (${minPct}% + ${maxPct}%) ÷ 2 = ${round(avgPct,3)}%.`);
       rec._calc_steps.push(`Solution mass at avg dilution = tablet weight ÷ (dilution % ÷ 100) = ${tabletWeightGrams.toFixed(1)}g ÷ ${round(avgPct/100,4)} = ${round(solutionMassAvg,1)}g.`);
@@ -1068,6 +1099,50 @@ function recomputeRTU(rec){
 }
 function round(n,d){ return isFinite(n) ? Number(n.toFixed(d)) : null; }
 
+/* ---- Complete a withheld solid-dose RTU calc once the user confirms tablet count ---- */
+function applyTabletCount(rec, count){
+  const priceNum = parseFloat(rec.price);
+  const minPct = parseFloat(rec.minimum_dilution_percent);
+  const maxPct = parseFloat(rec.maximum_dilution_percent);
+  const tabletWeightGrams = rec._tablet_weight_g;
+  if(isNaN(priceNum) || isNaN(minPct) || isNaN(maxPct) || !tabletWeightGrams || !count || count<=0) return rec;
+
+  const pricePerTablet = priceNum / count;
+  const GRAMS_PER_GALLON = 3785;
+  const avgPct = (minPct + maxPct) / 2;
+  const solutionMassAvg = tabletWeightGrams / (avgPct/100);
+  const yieldGalAtAvg = solutionMassAvg / GRAMS_PER_GALLON;
+  const yieldGalAtMinPct = (tabletWeightGrams / (minPct/100)) / GRAMS_PER_GALLON;
+  const yieldGalAtMaxPct = (tabletWeightGrams / (maxPct/100)) / GRAMS_PER_GALLON;
+  const costPerGalAvg = pricePerTablet / yieldGalAtAvg;
+  const costLow = pricePerTablet/yieldGalAtMinPct, costHigh = pricePerTablet/yieldGalAtMaxPct;
+
+  rec.rtu_yield_gallons = round(yieldGalAtAvg, 3);
+  rec.rtu_yield_liters = round(yieldGalAtAvg / 0.264172, 3);
+  rec.rtu_cost_per_gallon = round(costPerGalAvg, 3);
+  rec.rtu_cost_per_liter = round(costPerGalAvg * 0.264172, 4);
+  rec.price_per_unit = round(pricePerTablet, 3);
+  rec._rtu_yield_range_gal = [round(yieldGalAtMaxPct,3), round(yieldGalAtMinPct,3)];
+  rec._rtu_cost_range_gal = [round(costLow,3), round(costHigh,3)];
+
+  // Remember the confirmed count in pack_size so future views/reanalysis don't lose it.
+  if(!/\d+\s*(tablets?|tabs?|caplets?|capsules?)/i.test(rec.pack_size||'')){
+    rec.pack_size = `${count} tablets x ${round(tabletWeightGrams,1)}g` + (rec.pack_size ? ` (${rec.pack_size})` : '');
+  }
+
+  rec._calc_steps = (rec._calc_steps||[]).filter(s=>!/RTU cost was NOT calculated/.test(s));
+  rec._calc_steps.push(`Tablet count confirmed by user: ${count} tablets per case. Price per tablet = $${priceNum.toFixed(2)} ÷ ${count} = $${round(pricePerTablet,3)}/tablet.`);
+  rec._calc_steps.push(`Average dilution % = (${minPct}% + ${maxPct}%) ÷ 2 = ${round(avgPct,3)}%.`);
+  rec._calc_steps.push(`Solution mass at avg dilution = ${tabletWeightGrams.toFixed(1)}g ÷ ${round(avgPct/100,4)} = ${round(solutionMassAvg,1)}g.`);
+  rec._calc_steps.push(`Yield = ${round(solutionMassAvg,1)}g ÷ 3785 g/gal (water density ≈ 1 g/mL) = ${round(yieldGalAtAvg,3)} gal.`);
+  rec._calc_steps.push(`Cost/gal = $${round(pricePerTablet,3)} ÷ ${round(yieldGalAtAvg,3)} gal = $${round(costPerGalAvg,3)}/gal.`);
+  rec._calc_steps.push(`Across the ${minPct}%–${maxPct}% dilution range, yield spans ${round(yieldGalAtMaxPct,3)}–${round(yieldGalAtMinPct,3)} gal, so cost/gal spans $${round(costLow,3)}–$${round(costHigh,3)}.`);
+
+  rec._tablet_count_unconfirmed = false;
+  delete rec._tablet_weight_g;
+  return rec;
+}
+
 /* =========================================================
    RESULT RENDERING
 ========================================================= */
@@ -1086,6 +1161,16 @@ function renderResult(rec){
       </div>
 
       <div>${(rec.tags||[]).map(t=>pill(t)).join('')}</div>
+
+      ${rec._tablet_count_unconfirmed ? `
+      <div class="confirm-block">
+        <div class="label">RTU cost not calculated — tablet count needed</div>
+        <p>A tablet weight (~${rec._tablet_weight_g ? rec._tablet_weight_g.toFixed(1) : '?'}g) was found, but no tablet count per case was found in the source text — so it's unclear whether ${fmtMoney(rec.price)||('$'+rec.price)} is a per-tablet price or a full case price. Those give very different RTU costs, so nothing was calculated. Enter the tablet count to complete it:</p>
+        <div class="row" style="margin-top:10px;">
+          <input type="number" id="tabletCountInput" min="1" step="1" placeholder="e.g. 40">
+          <button class="btn small" id="btnConfirmTabletCount">Calculate RTU cost</button>
+        </div>
+      </div>` : ''}
 
       <div class="field-grid" style="margin-top:16px;">
         ${kv('Category', rec.category)}
@@ -1138,6 +1223,20 @@ function renderResult(rec){
       </div>
     </div>
   `;
+  if(rec._tablet_count_unconfirmed){
+    const confirmBtn = document.getElementById('btnConfirmTabletCount');
+    confirmBtn.addEventListener('click', ()=>{
+      const input = document.getElementById('tabletCountInput');
+      const count = parseInt(input.value, 10);
+      if(!count || count<=0){ toast('Enter a valid tablet count.'); return; }
+      applyTabletCount(rec, count);
+      const idx = products.findIndex(p=>p.product_id===rec.product_id);
+      if(idx>=0){ products[idx] = rec; saveProducts(); renderDatabase(); }
+      currentResult = rec;
+      renderResult(rec);
+      toast('RTU cost calculated.');
+    });
+  }
   document.getElementById('btnSaveResult').addEventListener('click', ()=>{
     const idx = products.findIndex(p=>p.product_id===rec.product_id);
     if(idx>=0) products[idx]=rec; else products.push(rec);
@@ -1336,11 +1435,17 @@ function getMissingRTUFields(p){
   const hasDilution = isRTU || (p.minimum_dilution_percent!=null && p.maximum_dilution_percent!=null) || p.minimum_dilution_ratio;
   if(!hasDilution) missing.push({field:'dilution', label:'Dilution ratio or percentage', hint:'e.g. "0.7%-4.0%" or "1:64" — or say if it\'s sold ready-to-use'});
 
+  const isSolidDose = p.product_form && /tablet|solid dose|capsule|caplet|block/i.test(p.product_form);
+  const hasTabletCount = /\d+\s*(tablets?|tabs?|caplets?|capsules?)/i.test(p.pack_size||'');
+  if((isSolidDose || p._tablet_count_unconfirmed) && !hasTabletCount){
+    missing.push({field:'tablet_count', label:'Tablet count per case', hint:'e.g. "40 tablets per case" — needed to split the case price into a per-tablet price'});
+  }
+
   return missing;
 }
 function needsReanalysis(p){
   const noRTU = p.rtu_cost_per_gallon===null || p.rtu_cost_per_gallon===undefined || p.rtu_cost_per_gallon==='';
-  return noRTU && getMissingRTUFields(p).length>0;
+  return noRTU && (getMissingRTUFields(p).length>0 || !!p._tablet_count_unconfirmed);
 }
 function refreshIncompleteCount(){
   const n = products.filter(needsReanalysis).length;
