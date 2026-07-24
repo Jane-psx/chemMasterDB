@@ -1803,6 +1803,7 @@ function avgPct(p){
   const statusEl = document.getElementById('browserStatus');
   const openNewTab = document.getElementById('browserOpenNewTab');
   const nameInput = document.getElementById('inName');
+  const priceInput = document.getElementById('inPrice');
 
   let lastLoadedUrl = null;
   let queryDirty = false; // becomes true once the user hand-edits the search box
@@ -1828,15 +1829,22 @@ function avgPct(p){
   function autoFillFromName(){
     const name = nameInput.value.trim();
     if(!name) return;
-    const q = name + ' dilution rate';
+    const priceVal = priceInput.value.trim();
+    const priceText = priceVal ? ` $${priceVal}` : '';
+    const q = name + priceText + ' dilution rate';
     queryDirty = false;
     runSearch(q, {auto:true});
   }
 
-  // Auto-search as the product name is typed, unless the user has manually
+  // Auto-search as the product name or price is typed, unless the user has manually
   // edited the search box (in which case we don't want to clobber it).
   let nameDebounce = null;
   nameInput.addEventListener('input', ()=>{
+    if(queryDirty) return;
+    clearTimeout(nameDebounce);
+    nameDebounce = setTimeout(autoFillFromName, 600);
+  });
+  priceInput.addEventListener('input', ()=>{
     if(queryDirty) return;
     clearTimeout(nameDebounce);
     nameDebounce = setTimeout(autoFillFromName, 600);
