@@ -288,8 +288,12 @@
             <div class="hint">Just the number — no need to type "Price: $" in the box below anymore.</div>
           </div>
           <div class="field">
-            <label>SDS / Specification / Manufacturer text</label>
+            <div class="row" style="justify-content:space-between; margin-bottom:5px;">
+              <label style="margin-bottom:0;">SDS / Specification / Manufacturer text</label>
+              <button type="button" class="link-btn" id="btnCleanSDS" title="Re-break flattened text into readable sections">Clean up formatting</button>
+            </div>
             <textarea id="inSDS" placeholder="Paste SDS text, product spec sheet, or manufacturer info here…" style="min-height:180px;"></textarea>
+            <div class="hint">Pasted text that lost its line breaks (common when copying from a PDF) is reformatted into sections automatically.</div>
           </div>
           <div class="field">
             <label>Pricing / supplier / contract info (optional)</label>
@@ -856,6 +860,71 @@ document.getElementById('btnClearInputs').addEventListener('click', ()=>{
   document.getElementById('inSourcedFrom').value='';
   document.getElementById('inNotes').value='';
 });
+
+/* =========================================================
+   SDS FIELD PASTE REFORMATTING
+   Many PDFs store text with no real line breaks at all, so a copy from them
+   arrives on the clipboard already flattened — there's no original structure
+   left to "preserve". This detects that case and reconstructs readable
+   section breaks; text that already has normal line breaks is left alone.
+========================================================= */
+const SDS_SECTION_LABELS = [
+  'Product name','Product identifier','Other means of identification','Recommended use',
+  'Uses advised against','Restrictions on use','Product dilution information','Directions for use',
+  'Manufacturer','Company','Address','Emergency telephone','Emergency phone number','Issuing date',
+  'Revision date','Version number','Supersedes','Hazard classification','Signal word',
+  'Hazard statement(?:s)?','Precautionary statement(?:s)?','First aid measures',
+  'Fire[- ]fighting measures','Accidental release measures','Handling and storage',
+  'Exposure controls\\s*/?\\s*personal protection','Physical and chemical properties',
+  'Stability and reactivity','Toxicological information','Ecological information',
+  'Disposal considerations','Transport information','Regulatory information','Other information',
+  'Section\\s*\\d{1,2}','At use concentration','SDS\\s*#','CAS[- ]No','EPA Reg(?:istration)?\\s*(?:No)?',
+  'NFPA','HMIS','Pricing info','Pack size','Case price','Vendor','Supplier'
+];
+const SDS_LABEL_REGEX = new RegExp('\\s*(?=(' + SDS_SECTION_LABELS.join('|') + ')\\s*:)', 'gi');
+
+function looksLikeFlattenedBlob(text){
+  if(!text) return false;
+  const len = text.length;
+  if(len < 300) return false; // short pastes aren't worth touching either way
+  const newlineCount = (text.match(/\n/g)||[]).length;
+  if(newlineCount === 0) return true; // no breaks at all in a long paste — classic PDF flatten
+  const avgLineLen = len / (newlineCount+1);
+  return avgLineLen > 250; // has a few breaks, but still effectively one huge run-on block
+}
+
+function reconstructSdsFormatting(text){
+  let t = text;
+  t = t.replace(SDS_LABEL_REGEX, '\n');           // break before recognized field/section labels
+  t = t.replace(/ {2,}/g, '\n');                  // break at column-gap spacing from copied tables/PDFs
+  t = t.replace(/\n{3,}/g, '\n\n');                // collapse resulting excess blank lines
+  return t.split('\n').map(l=>l.trim()).filter((l,i,arr)=> l!=='' || arr[i-1]!=='').join('\n').trim();
+}
+
+(function(){
+  const sdsField = document.getElementById('inSDS');
+  sdsField.addEventListener('paste', (e)=>{
+    const clip = e.clipboardData || window.clipboardData;
+    if(!clip) return;
+    const text = clip.getData('text/plain');
+    if(!text || !looksLikeFlattenedBlob(text)) return; // let the browser paste it untouched
+
+    e.preventDefault();
+    const cleaned = reconstructSdsFormatting(text);
+    const start = sdsField.selectionStart, end = sdsField.selectionEnd;
+    sdsField.value = sdsField.value.slice(0, start) + cleaned + sdsField.value.slice(end);
+    const newPos = start + cleaned.length;
+    sdsField.selectionStart = sdsField.selectionEnd = newPos;
+    toast('That paste had lost its line breaks — reformatted it into sections.');
+  });
+
+  document.getElementById('btnCleanSDS').addEventListener('click', ()=>{
+    const current = sdsField.value;
+    if(!current.trim()){ toast('Nothing to clean up yet.'); return; }
+    sdsField.value = reconstructSdsFormatting(current);
+    toast('Reformatted.');
+  });
+})();
 
 document.getElementById('btnAnalyze').addEventListener('click', analyzeProduct);
 
