@@ -403,16 +403,19 @@
         <div class="grid2">
           <div class="field">
             <label>Brand / manufacturer (optional)</label>
-            <input type="text" id="mcBrand" placeholder="e.g. Ecolab">
+            <input type="text" id="mcBrand" list="mcBrandList" placeholder="Select or type — e.g. Ecolab" autocomplete="off">
+            <datalist id="mcBrandList"></datalist>
           </div>
           <div class="field">
             <label>Category (optional)</label>
-            <input type="text" id="mcCategory" placeholder="e.g. Delimer">
+            <input type="text" id="mcCategory" list="mcCategoryList" placeholder="Select or type — e.g. Delimer" autocomplete="off">
+            <datalist id="mcCategoryList"></datalist>
           </div>
         </div>
         <div class="field">
           <label>Sourced from (optional)</label>
-          <input type="text" id="mcSourcedFrom" placeholder="e.g. Prime Source GPO, WellLink, HPSI">
+          <input type="text" id="mcSourcedFrom" list="mcSourcedList" placeholder="Select or type — e.g. Prime Source GPO" autocomplete="off">
+          <datalist id="mcSourcedList"></datalist>
         </div>
         <div class="field">
           <label>Case price ($)</label>
@@ -482,6 +485,28 @@
             </label>
           </div>
         </div>
+
+        <details style="margin-bottom:14px;">
+          <summary style="cursor:pointer; font-size:12px; font-weight:650; color:var(--ink-soft);">Manage dropdown lists</summary>
+          <div style="margin-top:10px;">
+            <div class="field">
+              <label>Brands / manufacturers (one per line)</label>
+              <textarea id="mcListBrands" rows="4" style="width:100%; font-size:12px; font-family:var(--sans); border:1px solid var(--border); border-radius:6px; padding:7px 9px; resize:vertical;"></textarea>
+            </div>
+            <div class="field">
+              <label>Categories (one per line)</label>
+              <textarea id="mcListCategories" rows="4" style="width:100%; font-size:12px; font-family:var(--sans); border:1px solid var(--border); border-radius:6px; padding:7px 9px; resize:vertical;"></textarea>
+            </div>
+            <div class="field">
+              <label>Sourced from (one per line)</label>
+              <textarea id="mcListSources" rows="4" style="width:100%; font-size:12px; font-family:var(--sans); border:1px solid var(--border); border-radius:6px; padding:7px 9px; resize:vertical;"></textarea>
+            </div>
+            <div class="row">
+              <button class="btn small" id="btnMcSaveLists">Save lists</button>
+              <span class="hint">Database values are merged in automatically; these are your own additions.</span>
+            </div>
+          </div>
+        </details>
 
         <div class="row" style="margin-top:6px;">
           <button class="btn" id="btnManualCalc">Calculate</button>
@@ -1015,6 +1040,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     if(btn.dataset.view==='compare') populateCompareSelect();
     if(btn.dataset.view==='settings') refreshDbCount();
     if(btn.dataset.view==='sheet') renderSheet();
+    if(btn.dataset.view==='calc') mcRefreshLists();
   });
 });
 
@@ -2305,8 +2331,76 @@ document.getElementById('btnManualSave').addEventListener('click', ()=>{
   products.push(rec);
   saveProducts();
   refreshDbCount();
+  mcListAdd('brands', rec.brand);
+  mcListAdd('categories', rec.category);
+  mcListAdd('sources', rec.sourced_from);
+  mcRefreshLists();
   toast(`Saved "${rec.product_name}" to the database.`);
 });
+
+/* =========================================================
+   MANUAL CALC — managed dropdown lists (brand / category / source)
+   Datalist combos: type freely or pick. Options = user-managed list
+   (localStorage cpie_lists, editable under "Manage dropdown lists")
+   merged with every distinct value already in the product database.
+   Values used on save are added to the managed list automatically.
+========================================================= */
+const LS_KEY_LISTS = 'cpie_lists';
+const MC_LIST_SEEDS = {
+  sources: ['Prime Source GPO','WellLink','HPSI','Entegra','Provista','Medtrust'],
+  categories: ['All-Purpose Cleaner','Bathroom Cleaner','Degreaser','Delimer / Descaler','Disinfectant','Drain Maintainer',
+    'Floor Care','Glass Cleaner','Laundry Detergent','Odor Eliminator','Rinse Aid','Sanitizer','Warewash Detergent'],
+  brands: []
+};
+function loadLists(){
+  try{
+    const l = JSON.parse(localStorage.getItem(LS_KEY_LISTS));
+    if(l && typeof l==='object') return { brands:l.brands||[], categories:l.categories||[], sources:l.sources||[] };
+  }catch(e){}
+  return JSON.parse(JSON.stringify(MC_LIST_SEEDS));
+}
+let mcLists = loadLists();
+function saveLists(){ localStorage.setItem(LS_KEY_LISTS, JSON.stringify(mcLists)); }
+
+function mcListAdd(kind, value){
+  value = String(value||'').trim();
+  if(!value) return;
+  if(!mcLists[kind].some(v=>v.toLowerCase()===value.toLowerCase())){
+    mcLists[kind].push(value); saveLists();
+  }
+}
+// managed list + distinct DB values, case-insensitive dedupe, sorted
+function mcListOptions(kind){
+  const fromDb = [];
+  products.forEach(p=>{
+    if(kind==='brands'){ if(p.brand) fromDb.push(p.brand); if(p.manufacturer) fromDb.push(p.manufacturer); }
+    if(kind==='categories' && p.category) fromDb.push(p.category);
+    if(kind==='sources' && p.sourced_from) fromDb.push(p.sourced_from);
+  });
+  const seen = {}, out = [];
+  [...mcLists[kind], ...fromDb].forEach(v=>{
+    v = String(v).trim(); if(!v) return;
+    const k = v.toLowerCase();
+    if(!seen[k]){ seen[k]=1; out.push(v); }
+  });
+  return out.sort((a,b)=>a.localeCompare(b));
+}
+function mcRefreshLists(){
+  const fill = (dlId, kind)=>{
+    document.getElementById(dlId).innerHTML = mcListOptions(kind).map(v=>`<option value="${esc(v)}"></option>`).join('');
+  };
+  fill('mcBrandList','brands'); fill('mcCategoryList','categories'); fill('mcSourcedList','sources');
+  document.getElementById('mcListBrands').value = mcLists.brands.join('\n');
+  document.getElementById('mcListCategories').value = mcLists.categories.join('\n');
+  document.getElementById('mcListSources').value = mcLists.sources.join('\n');
+}
+document.getElementById('btnMcSaveLists').addEventListener('click', ()=>{
+  const parse = id => document.getElementById(id).value.split('\n').map(s=>s.trim()).filter(Boolean);
+  mcLists = { brands: parse('mcListBrands'), categories: parse('mcListCategories'), sources: parse('mcListSources') };
+  saveLists(); mcRefreshLists();
+  toast('Dropdown lists saved.');
+});
+mcRefreshLists();
 
 /* =========================================================
    MANUAL CALC — research browsers (form-aware, tabbed)
