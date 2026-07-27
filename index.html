@@ -156,6 +156,20 @@
 
   /* ---------- Compare ---------- */
   .match-item{ display:flex; align-items:center; gap:12px; padding:12px; border:1px solid var(--border); border-radius:6px; margin-bottom:8px; background:#fff; }
+  .match-item input.match-check{ width:15px; height:15px; accent-color:var(--teal); cursor:pointer; flex:none; }
+  .sheet-table-wrap{ overflow:auto; }
+  table.sheet-table{ width:100%; border-collapse:collapse; font-size:12px; min-width:1280px; }
+  table.sheet-table th{ text-align:left; padding:8px 9px; background:var(--panel-alt); border-bottom:1px solid var(--border);
+    font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-faint); white-space:nowrap; position:sticky; top:0; }
+  table.sheet-table th.grp-a{ box-shadow: inset 3px 0 0 var(--teal); }
+  table.sheet-table th.grp-b{ box-shadow: inset 3px 0 0 var(--amber); }
+  table.sheet-table td{ padding:8px 9px; border-bottom:1px solid var(--border); vertical-align:top; }
+  table.sheet-table tr:hover td{ background:var(--teal-soft); }
+  table.sheet-table td.num{ font-family:var(--mono); font-size:11.5px; white-space:nowrap; }
+  table.sheet-table td .prod-name{ font-weight:650; }
+  table.sheet-table td .prod-sub{ font-size:11px; color:var(--ink-soft); }
+  table.sheet-table input.sheet-notes{ width:150px; border:1px solid var(--border); border-radius:5px; padding:5px 7px; font-size:12px; font-family:var(--sans); }
+  table.sheet-table input.sheet-notes:focus{ outline:none; border-color:var(--teal); box-shadow:0 0 0 2px var(--teal-soft); }
   .match-item .info{ flex:1; }
   .match-item .name{ font-weight:650; font-size:13px; }
   .match-item .cat{ font-size:11.5px; color:var(--ink-soft); }
@@ -265,6 +279,7 @@
   <button class="tab-btn active" data-view="analyze">Analyze Product</button>
   <button class="tab-btn" data-view="database">Database <span id="dbCount" style="opacity:.6;font-weight:500;"></span></button>
   <button class="tab-btn" data-view="compare">Compare &amp; Match</button>
+  <button class="tab-btn" data-view="sheet">Sheet <span id="sheetCount" style="opacity:.6;font-weight:500;"></span></button>
   <button class="tab-btn" data-view="settings">Settings</button>
 </nav>
 
@@ -396,6 +411,52 @@
         <select id="compareSelect"><option value="">— choose a product —</option></select>
       </div>
       <div id="compareResults"></div>
+    </div>
+  </div>
+
+  <!-- ================= SHEET ================= -->
+  <div class="view" id="view-sheet">
+    <h2 class="section-title">Crosswalk sheet</h2>
+    <p class="section-desc">Match pairs you've added from Compare &amp; Match, kept in selected order (Item A = the product you compared, Item B = its match). Savings are computed from RTU $/gal. Export downloads a formatted Excel file.</p>
+
+    <div class="search-bar">
+      <button class="btn secondary small" id="btnExportSheetXlsx">Export to Excel</button>
+      <button class="btn ghost small" id="btnClearSheet">Clear sheet</button>
+      <div class="spacer"></div>
+      <span class="hint" id="sheetMsg"></span>
+    </div>
+
+    <div class="panel sheet-table-wrap" style="padding:0;">
+      <table class="sheet-table" id="sheetTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th class="grp-a">Product A</th>
+            <th>Brand / Mfr A</th>
+            <th>Source A</th>
+            <th>Category</th>
+            <th>Pack A</th>
+            <th>Case Price A</th>
+            <th>RTU $/Gal A</th>
+            <th class="grp-b">Product B (Match)</th>
+            <th>Brand / Mfr B</th>
+            <th>Source B</th>
+            <th>Pack B</th>
+            <th>Case Price B</th>
+            <th>RTU $/Gal B</th>
+            <th>Match %</th>
+            <th>Savings $/Gal</th>
+            <th>Savings %</th>
+            <th>Notes</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="sheetTableBody"></tbody>
+      </table>
+      <div class="empty-state" id="sheetEmptyState">
+        <div class="big">📋</div>
+        Nothing on the sheet yet — tick matches in Compare &amp; Match and add them here.
+      </div>
     </div>
   </div>
 
@@ -742,6 +803,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     if(btn.dataset.view==='database') renderDatabase();
     if(btn.dataset.view==='compare') populateCompareSelect();
     if(btn.dataset.view==='settings') refreshDbCount();
+    if(btn.dataset.view==='sheet') renderSheet();
   });
 });
 
@@ -1709,8 +1771,17 @@ document.getElementById('compareSelect').addEventListener('change', (e)=>{
     wrap.innerHTML = targetPanel + `<div class="empty-state"><div class="big">🔎</div>Add more products to the database to see matches.</div>`;
     return;
   }
-  wrap.innerHTML = targetPanel + `<div style="margin-top:14px;">` + scored.map(({p,score})=>`
+  wrap.innerHTML = targetPanel + `
+    <div class="row" style="margin-top:14px; margin-bottom:10px;">
+      <label style="margin:0; display:flex; align-items:center; gap:7px; cursor:pointer; text-transform:none; font-size:12px; color:var(--ink-soft); font-weight:600;">
+        <input type="checkbox" class="match-check" id="matchSelectAll"> Select all
+      </label>
+      <div class="spacer"></div>
+      <button class="btn small" id="btnAddToSheet" disabled>Add selected to Sheet</button>
+    </div>
+    <div>` + scored.map(({p,score})=>`
     <div class="match-item">
+      <input type="checkbox" class="match-check match-row-check" data-mid="${p.product_id}">
       <div class="info">
         <div class="name">${esc(p.product_name)||p.product_id}</div>
         <div class="cat">${esc(p.category)||'—'} · ${esc(p.product_form)||'—'} · ${esc(p.brand)||'—'}</div>
@@ -1726,6 +1797,45 @@ document.getElementById('compareSelect').addEventListener('change', (e)=>{
       </div>
     </div>
   `).join('') + `</div>`;
+
+  // ----- add-to-sheet wiring -----
+  const scoreById = {}; scored.forEach(({p,score})=>{ scoreById[p.product_id]=score; });
+  const rowChecks = ()=>[...wrap.querySelectorAll('.match-row-check')];
+  const btnAdd = wrap.querySelector('#btnAddToSheet');
+  const selAll = wrap.querySelector('#matchSelectAll');
+  function refreshAddBtn(){
+    const n = rowChecks().filter(c=>c.checked).length;
+    btnAdd.disabled = n===0;
+    btnAdd.textContent = n ? `Add selected to Sheet (${n})` : 'Add selected to Sheet';
+  }
+  rowChecks().forEach(c=>c.addEventListener('change', ()=>{
+    selAll.checked = rowChecks().every(x=>x.checked);
+    refreshAddBtn();
+  }));
+  selAll.addEventListener('change', ()=>{
+    rowChecks().forEach(c=>c.checked = selAll.checked);
+    refreshAddBtn();
+  });
+  btnAdd.addEventListener('click', ()=>{
+    const picked = rowChecks().filter(c=>c.checked).map(c=>c.dataset.mid);
+    let added = 0, dupes = 0;
+    picked.forEach(mid=>{
+      const match = products.find(p=>p.product_id===mid);
+      if(!match) return;
+      const key = target.product_id + '|' + mid;
+      if(sheetRows.some(r=>r.key===key)){ dupes++; return; }
+      const sc = scoreById[mid] || matchScore(target, match);
+      sheetRows.push({
+        key, aId: target.product_id, bId: mid,
+        aSnap: sheetSnapshot(target), bSnap: sheetSnapshot(match),
+        score: sc.total, tier: sc.tier.label, notes: '', added: Date.now()
+      });
+      added++;
+    });
+    saveSheet(); refreshSheetCount();
+    rowChecks().forEach(c=>c.checked=false); selAll.checked=false; refreshAddBtn();
+    toast(added ? `Added ${added} pair${added>1?'s':''} to the sheet${dupes?` (${dupes} already there)`:''}.` : (dupes ? 'Those pairs are already on the sheet.' : 'Nothing added.'));
+  });
 });
 
 function savingsBadge(target, match){
@@ -1782,6 +1892,167 @@ function avgPct(p){
   if(!isNaN(min) && !isNaN(max)) return (min+max)/2;
   return null;
 }
+
+/* =========================================================
+   SHEET (crosswalk of selected match pairs)
+========================================================= */
+const LS_KEY_SHEET = 'cpie_sheet';
+let sheetRows = loadSheet();
+
+function loadSheet(){
+  try{ return JSON.parse(localStorage.getItem(LS_KEY_SHEET)) || []; }catch(e){ return []; }
+}
+function saveSheet(){ localStorage.setItem(LS_KEY_SHEET, JSON.stringify(sheetRows)); }
+function refreshSheetCount(){
+  const el = document.getElementById('sheetCount');
+  if(el) el.textContent = sheetRows.length ? `(${sheetRows.length})` : '';
+}
+function sheetSnapshot(p){
+  return {
+    product_id: p.product_id, product_name: p.product_name, brand: p.brand, manufacturer: p.manufacturer,
+    category: p.category, pack_size: p.pack_size, price: p.price,
+    rtu_cost_per_gallon: p.rtu_cost_per_gallon, sourced_from: p.sourced_from
+  };
+}
+// Prefer the live database record (fresh pricing); fall back to the snapshot if it was deleted.
+function sheetResolve(id, snap){ return products.find(p=>p.product_id===id) || snap; }
+
+function brandMfr(p){
+  const b = p.brand || '', m = p.manufacturer || '';
+  if(b && m && b.toLowerCase()!==m.toLowerCase()) return b + ' / ' + m;
+  return b || m || '\u2014';
+}
+function fmtMoney(v, dp){ const n = parseFloat(v); return isNaN(n) ? '\u2014' : '$' + n.toFixed(dp); }
+function sheetSavings(a, b){
+  const ra = parseFloat(a.rtu_cost_per_gallon), rb = parseFloat(b.rtu_cost_per_gallon);
+  if(isNaN(ra) || isNaN(rb) || ra<=0 || rb<=0) return null;
+  return { perGal: ra - rb, pct: (ra - rb) / ra * 100 }; // positive = B cheaper than A
+}
+
+function renderSheet(){
+  refreshSheetCount();
+  const body = document.getElementById('sheetTableBody');
+  const empty = document.getElementById('sheetEmptyState');
+  const table = document.getElementById('sheetTable');
+  if(!sheetRows.length){
+    body.innerHTML = ''; empty.style.display = 'block'; table.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none'; table.style.display = '';
+  body.innerHTML = sheetRows.map((r, i)=>{
+    const a = sheetResolve(r.aId, r.aSnap), b = sheetResolve(r.bId, r.bSnap);
+    const sv = sheetSavings(a, b);
+    let svGal = '\u2014', svPct = '\u2014', svClass = '';
+    if(sv){
+      svGal = (sv.perGal>=0?'$':'\u2212$') + Math.abs(sv.perGal).toFixed(3);
+      svPct = (sv.pct>=0?'':'\u2212') + Math.abs(sv.pct).toFixed(1) + '%';
+      svClass = Math.abs(sv.perGal)<0.0005 ? '' : (sv.perGal>0 ? 'style="color:var(--green); font-weight:650;"' : 'style="color:var(--red); font-weight:650;"');
+    }
+    const tierC = r.score>=70 ? 'green' : r.score>=40 ? 'amber' : 'red';
+    return `<tr>
+      <td class="num">${i+1}</td>
+      <td><div class="prod-name">${esc(a.product_name)||a.product_id}</div></td>
+      <td><div class="prod-sub">${esc(brandMfr(a))}</div></td>
+      <td>${esc(a.sourced_from)||'\u2014'}</td>
+      <td>${esc(a.category)||'\u2014'}</td>
+      <td>${esc(a.pack_size)||'\u2014'}</td>
+      <td class="num">${fmtMoney(a.price,2)}</td>
+      <td class="num">${fmtMoney(a.rtu_cost_per_gallon,3)}</td>
+      <td><div class="prod-name">${esc(b.product_name)||b.product_id}</div></td>
+      <td><div class="prod-sub">${esc(brandMfr(b))}</div></td>
+      <td>${esc(b.sourced_from)||'\u2014'}</td>
+      <td>${esc(b.pack_size)||'\u2014'}</td>
+      <td class="num">${fmtMoney(b.price,2)}</td>
+      <td class="num">${fmtMoney(b.rtu_cost_per_gallon,3)}</td>
+      <td class="num"><span class="pill ${tierC}">${r.score}%</span></td>
+      <td class="num" ${svClass}>${svGal}</td>
+      <td class="num" ${svClass}>${svPct}</td>
+      <td><input type="text" class="sheet-notes" data-key="${esc(r.key)}" value="${esc(r.notes||'')}" placeholder="e.g. pending sample"></td>
+      <td><button class="btn danger small" data-remove="${esc(r.key)}" title="Remove from sheet">\u2715</button></td>
+    </tr>`;
+  }).join('');
+
+  body.querySelectorAll('.sheet-notes').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const row = sheetRows.find(r=>r.key===inp.dataset.key);
+      if(row){ row.notes = inp.value; saveSheet(); }
+    });
+  });
+  body.querySelectorAll('[data-remove]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      sheetRows = sheetRows.filter(r=>r.key!==btn.dataset.remove);
+      saveSheet(); renderSheet();
+    });
+  });
+}
+
+document.getElementById('btnClearSheet').addEventListener('click', ()=>{
+  if(!sheetRows.length){ toast('Sheet is already empty.'); return; }
+  if(!confirm('Remove all pairs from the sheet? (Products stay in the database.)')) return;
+  sheetRows = []; saveSheet(); renderSheet();
+  toast('Sheet cleared.');
+});
+
+/* ---------- Excel export (SheetJS, lazy-loaded) ---------- */
+let _xlsxLoading = null;
+function loadSheetJS(){
+  if(window.XLSX) return Promise.resolve();
+  if(_xlsxLoading) return _xlsxLoading;
+  _xlsxLoading = new Promise((res, rej)=>{
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = ()=>res();
+    s.onerror = ()=>{ _xlsxLoading = null; rej(new Error('Could not load the Excel library — check your internet connection.')); };
+    document.head.appendChild(s);
+  });
+  return _xlsxLoading;
+}
+
+document.getElementById('btnExportSheetXlsx').addEventListener('click', async ()=>{
+  if(!sheetRows.length){ toast('Nothing on the sheet to export.'); return; }
+  const btn = document.getElementById('btnExportSheetXlsx');
+  btn.disabled = true; const prev = btn.textContent; btn.textContent = 'Preparing\u2026';
+  try{
+    await loadSheetJS();
+    const headers = ['#','Product A','Brand / Mfr A','Source A','Category','Pack A','Case Price A ($)','RTU $/Gal A',
+      'Product B (Match)','Brand / Mfr B','Source B','Pack B','Case Price B ($)','RTU $/Gal B',
+      'Match %','Savings $/Gal','Savings %','Notes'];
+    const num = v => { const n = parseFloat(v); return isNaN(n) ? null : n; };
+    const rows = sheetRows.map((r, i)=>{
+      const a = sheetResolve(r.aId, r.aSnap), b = sheetResolve(r.bId, r.bSnap);
+      const sv = sheetSavings(a, b);
+      return [ i+1,
+        a.product_name||a.product_id, brandMfr(a)==='\u2014'?'':brandMfr(a), a.sourced_from||'', a.category||'', a.pack_size||'',
+        num(a.price), num(a.rtu_cost_per_gallon),
+        b.product_name||b.product_id, brandMfr(b)==='\u2014'?'':brandMfr(b), b.sourced_from||'', b.pack_size||'',
+        num(b.price), num(b.rtu_cost_per_gallon),
+        r.score/100, sv?sv.perGal:null, sv?sv.pct/100:null, r.notes||'' ];
+    });
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    // column widths
+    ws['!cols'] = [ {wch:4},{wch:30},{wch:22},{wch:18},{wch:18},{wch:14},{wch:13},{wch:12},
+      {wch:30},{wch:22},{wch:18},{wch:14},{wch:13},{wch:12},{wch:9},{wch:13},{wch:10},{wch:26} ];
+    // number formats per data cell
+    const fmts = {6:'$#,##0.00', 7:'$#,##0.000', 12:'$#,##0.00', 13:'$#,##0.000', 14:'0%', 15:'$#,##0.000;\u2212$#,##0.000', 16:'0.0%;\u22120.0%'};
+    for(let R=1; R<=rows.length; R++){
+      for(const C in fmts){
+        const ref = XLSX.utils.encode_cell({r:R, c:+C});
+        if(ws[ref] && typeof ws[ref].v === 'number') ws[ref].z = fmts[C];
+      }
+    }
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({s:{r:0,c:0}, e:{r:rows.length, c:headers.length-1}}) };
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Crosswalk');
+    const d = new Date(), pad = n=>String(n).padStart(2,'0');
+    XLSX.writeFile(wb, `crosswalk-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.xlsx`);
+    document.getElementById('sheetMsg').textContent = `Exported ${rows.length} pair${rows.length>1?'s':''}.`;
+    toast('Excel file downloaded.');
+  }catch(e){
+    toast('Export failed: ' + e.message);
+  }finally{
+    btn.disabled = false; btn.textContent = prev;
+  }
+});
 
 /* =========================================================
    MINI BROWSER (Analyze view — dedicated Google search panel)
@@ -1951,6 +2222,7 @@ function avgPct(p){
 ========================================================= */
 refreshKeyStatus();
 refreshDbCount();
+refreshSheetCount();
 renderDatabase();
 </script>
 </body>
