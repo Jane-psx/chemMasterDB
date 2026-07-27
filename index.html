@@ -511,6 +511,7 @@
           <button data-b="2">2 · Pack size</button>
           <button data-b="3">3 · Tablets</button>
           <button data-b="4">4 · Dilution</button>
+          <button data-b="5">5 · SDS</button>
         </div>
         <div class="mc-browser" id="mcBrowser1" data-forms="liquid,rtu,solid">
           <div class="mc-browser-head">
@@ -562,6 +563,19 @@
             <button class="btn ghost small" id="mcB4Sync" title="Rebuild this search from the product name field">&#8635; Name</button>
           </div>
           <div class="mc-frame-wrap"><iframe id="mcB4Frame" title="Dilution ratio research" referrerpolicy="no-referrer"></iframe></div>
+        </div>
+
+        <div class="mc-browser" id="mcBrowser5" data-forms="liquid,rtu,solid">
+          <div class="mc-browser-head">
+            <span>Research 5 · Safety Data Sheet (SDS)</span>
+            <a href="https://www.google.com/search?q=" id="mcB5NewTab" class="link-btn" target="_blank" rel="noopener">Open in new tab &#8599;</a>
+          </div>
+          <div class="browser-toolbar">
+            <input type="text" id="mcB5Query" class="browser-address" placeholder="Type a product name above to auto-search…">
+            <button class="btn small" id="mcB5Go">Go</button>
+            <button class="btn ghost small" id="mcB5Sync" title="Rebuild this search from the product name field">&#8635; Name</button>
+          </div>
+          <div class="mc-frame-wrap"><iframe id="mcB5Frame" title="SDS research" referrerpolicy="no-referrer"></iframe></div>
         </div>
       </div>
     </div>
@@ -2320,7 +2334,8 @@ document.getElementById('btnManualSave').addEventListener('click', ()=>{
     { n:1, queryFor: name => `${name}, is this liquid concentrate, ready to use (no dilution), or solid dose (tablet/block/capsule)?` },
     { n:2, queryFor: name => `${name}, what's the pack size (concentrate volume)?` },
     { n:3, queryFor: name => `${name}, how many tablets/units per case and what is the weight per tablet in grams?` },
-    { n:4, queryFor: name => `${name}, dilution stated as ratio 1:X, oz per gallon, or use % — min (heavy soil) and max (light soil)?` }
+    { n:4, queryFor: name => `${name}, dilution stated as ratio 1:X, oz per gallon, or use % — min (heavy soil) and max (light soil)?` },
+    { n:5, queryFor: name => `${name} SDS` }
   ];
 
   const browsers = CONFIGS.map(cfg=>{
