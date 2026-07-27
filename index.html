@@ -243,6 +243,24 @@
     border-bottom:1px solid var(--border); background:#fff; color:var(--ink-faint);
   }
   .browser-subbar .link-btn{ font-size:11.5px; white-space:nowrap; }
+  .mc-layout{ display:grid; grid-template-columns:1fr 1fr 2fr; gap:16px; align-items:start; }
+  @media (max-width:1100px){ .mc-layout{ grid-template-columns:1fr; } }
+  .mc-col-input .grid2{ grid-template-columns:1fr; gap:0; }
+  .mc-col-research{ position:sticky; top:58px; }
+  .mc-browser-tabs{ display:flex; gap:2px; background:var(--panel); border:1px solid var(--border); border-bottom:none;
+    border-radius:var(--radius) var(--radius) 0 0; padding:0 8px; overflow-x:auto; }
+  .mc-browser-tabs button{ background:none; border:none; padding:11px 12px; font-size:12px; font-weight:650; color:var(--ink-soft);
+    cursor:pointer; border-bottom:2px solid transparent; font-family:var(--sans); white-space:nowrap; }
+  .mc-browser-tabs button.active{ color:var(--teal-deep); border-bottom-color:var(--teal); }
+  .mc-browser-tabs button:hover{ color:var(--teal-deep); }
+  .mc-browser{ border:1px solid var(--border); border-radius:0 0 var(--radius) var(--radius); overflow:hidden; background:var(--panel); box-shadow:var(--shadow); display:flex; flex-direction:column; }
+  .mc-browser .mc-browser-head{ padding:9px 12px 7px; background:var(--panel-alt); border-bottom:1px solid var(--border);
+    font-size:11.5px; font-weight:650; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-soft);
+    display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .mc-browser .mc-browser-head .link-btn{ text-transform:none; letter-spacing:0; font-weight:600; }
+  .mc-browser .browser-toolbar{ border-top:none; }
+  .mc-browser .mc-frame-wrap{ position:relative; background:#fff; height:min(62vh, 640px); min-height:380px; }
+  .mc-browser .mc-frame-wrap iframe{ position:absolute; inset:0; width:100%; height:100%; border:none; }
   .browser-frame-wrap{ flex:1 1 auto; position:relative; background:#fff; }
   .browser-frame-wrap iframe{ position:absolute; inset:0; width:100%; height:100%; border:none; }
   .browser-panel-title{
@@ -277,6 +295,7 @@
 
 <nav class="tabs">
   <button class="tab-btn active" data-view="analyze">Analyze Product</button>
+  <button class="tab-btn" data-view="calc">Manual Calc</button>
   <button class="tab-btn" data-view="database">Database <span id="dbCount" style="opacity:.6;font-weight:500;"></span></button>
   <button class="tab-btn" data-view="compare">Compare &amp; Match</button>
   <button class="tab-btn" data-view="sheet">Sheet <span id="sheetCount" style="opacity:.6;font-weight:500;"></span></button>
@@ -365,6 +384,184 @@
             <div class="spacer"></div>
             <span class="hint" id="captureStatus"></span>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MANUAL CALC ================= -->
+  <div class="view" id="view-calc">
+    <h2 class="section-title">Manual dilution calculator</h2>
+    <p class="section-desc">Enter values from your own research (label, tech sheet, dispenser card) — no AI involved. The dilution ratio itself comes from the manufacturer; this computes RTU yield and cost from it, using the same math as the analyzer.</p>
+
+    <div class="mc-layout">
+      <div class="panel mc-col-input">
+        <div class="field">
+          <label>Product name</label>
+          <input type="text" id="mcName" placeholder="e.g. Lime-A-Way 4/1gl">
+        </div>
+        <div class="grid2">
+          <div class="field">
+            <label>Brand / manufacturer (optional)</label>
+            <input type="text" id="mcBrand" placeholder="e.g. Ecolab">
+          </div>
+          <div class="field">
+            <label>Category (optional)</label>
+            <input type="text" id="mcCategory" placeholder="e.g. Delimer">
+          </div>
+        </div>
+        <div class="field">
+          <label>Sourced from (optional)</label>
+          <input type="text" id="mcSourcedFrom" placeholder="e.g. Prime Source GPO, WellLink, HPSI">
+        </div>
+        <div class="field">
+          <label>Case price ($)</label>
+          <input type="number" id="mcPrice" step="0.01" min="0" placeholder="e.g. 86.56">
+        </div>
+        <div class="field">
+          <label>Product form</label>
+          <select id="mcForm">
+            <option value="liquid">Liquid concentrate</option>
+            <option value="rtu">Ready to use (no dilution)</option>
+            <option value="solid">Solid dose (tablet / block / capsule)</option>
+          </select>
+        </div>
+
+        <div id="mcPackWrap">
+          <label>Pack size (concentrate volume)</label>
+          <div class="row" style="gap:8px; margin-bottom:14px;">
+            <input type="number" id="mcPackCount" min="1" step="1" value="1" style="width:80px;" title="Containers per case">
+            <span class="hint" style="flex:none;">×</span>
+            <input type="number" id="mcPackSize" min="0" step="any" placeholder="e.g. 1" style="width:110px;" title="Size per container">
+            <select id="mcPackUnit" style="width:130px;">
+              <option value="gal">gallon</option>
+              <option value="l">liter</option>
+              <option value="qt">quart</option>
+              <option value="oz">fl oz</option>
+              <option value="ml">mL</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="mcSolidWrap" style="display:none;">
+          <div class="grid2">
+            <div class="field">
+              <label>Tablets / units per case</label>
+              <input type="number" id="mcTabCount" min="1" step="1" placeholder="e.g. 100">
+            </div>
+            <div class="field">
+              <label>Weight per tablet (grams)</label>
+              <input type="number" id="mcTabWeight" min="0" step="any" placeholder="e.g. 20">
+            </div>
+          </div>
+        </div>
+
+        <div id="mcDilutionWrap">
+          <div class="field">
+            <label>Dilution stated as</label>
+            <select id="mcDilMode">
+              <option value="ratio">Ratio — 1 : X</option>
+              <option value="oz">Ounces per gallon</option>
+              <option value="pct">Use concentration %</option>
+            </select>
+          </div>
+          <div class="grid2">
+            <div class="field">
+              <label id="mcDilMinLabel">Ratio X — min (heavy soil, e.g. 64)</label>
+              <input type="number" id="mcDilMin" min="0" step="any" placeholder="e.g. 64">
+            </div>
+            <div class="field">
+              <label id="mcDilMaxLabel">Ratio X — max (light soil, optional)</label>
+              <input type="number" id="mcDilMax" min="0" step="any" placeholder="e.g. 128">
+            </div>
+          </div>
+          <div class="field" id="mcRatioConvWrap">
+            <label style="text-transform:none; display:flex; align-items:center; gap:7px; cursor:pointer; font-size:12px; color:var(--ink-soft);">
+              <input type="checkbox" id="mcRatioTotal" style="width:14px; height:14px; accent-color:var(--teal);">
+              Treat 1:X as X <em>total</em> parts (yield = volume × X) instead of X parts water (yield = volume × (X+1))
+            </label>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:6px;">
+          <button class="btn" id="btnManualCalc">Calculate</button>
+          <button class="btn ghost" id="btnManualClear">Clear</button>
+          <div class="spacer"></div>
+          <span class="hint" id="mcMsg"></span>
+        </div>
+      </div>
+
+      <div class="mc-col-results">
+        <div class="panel" id="mcResultPanel" style="display:none; margin-bottom:16px;">
+          <h2 class="section-title" style="font-size:14px;">Results</h2>
+          <div id="mcResultBody"></div>
+          <div class="row" style="margin-top:14px;">
+            <button class="btn" id="btnManualSave">Save to database</button>
+          </div>
+        </div>
+        <div class="empty-state" id="mcEmptyState" style="border:1px dashed var(--border); border-radius:var(--radius); margin-bottom:16px;">
+          <div class="big">🧮</div>
+          Enter price, pack size, and a dilution value, then Calculate.
+        </div>
+      </div>
+
+      <div class="mc-col-research">
+        <div class="mc-browser-tabs" id="mcBrowserTabs">
+          <button data-b="1" class="active">1 · Form</button>
+          <button data-b="2">2 · Pack size</button>
+          <button data-b="3">3 · Tablets</button>
+          <button data-b="4">4 · Dilution</button>
+        </div>
+        <div class="mc-browser" id="mcBrowser1" data-forms="liquid,rtu,solid">
+          <div class="mc-browser-head">
+            <span>Research 1 · Product form — concentrate, RTU, or solid dose?</span>
+            <a href="https://www.google.com/search?q=" id="mcB1NewTab" class="link-btn" target="_blank" rel="noopener">Open in new tab &#8599;</a>
+          </div>
+          <div class="browser-toolbar">
+            <input type="text" id="mcB1Query" class="browser-address" placeholder="Type a product name above to auto-search…">
+            <button class="btn small" id="mcB1Go">Go</button>
+            <button class="btn ghost small" id="mcB1Sync" title="Rebuild this search from the product name field">&#8635; Name</button>
+          </div>
+          <div class="mc-frame-wrap"><iframe id="mcB1Frame" title="Product form research" referrerpolicy="no-referrer"></iframe></div>
+        </div>
+
+        <div class="mc-browser" id="mcBrowser2" data-forms="liquid,rtu">
+          <div class="mc-browser-head">
+            <span>Research 2 · Pack size (concentrate volume)</span>
+            <a href="https://www.google.com/search?q=" id="mcB2NewTab" class="link-btn" target="_blank" rel="noopener">Open in new tab &#8599;</a>
+          </div>
+          <div class="browser-toolbar">
+            <input type="text" id="mcB2Query" class="browser-address" placeholder="Type a product name above to auto-search…">
+            <button class="btn small" id="mcB2Go">Go</button>
+            <button class="btn ghost small" id="mcB2Sync" title="Rebuild this search from the product name field">&#8635; Name</button>
+          </div>
+          <div class="mc-frame-wrap"><iframe id="mcB2Frame" title="Pack size research" referrerpolicy="no-referrer"></iframe></div>
+        </div>
+
+        <div class="mc-browser" id="mcBrowser3" data-forms="solid">
+          <div class="mc-browser-head">
+            <span>Research 3 · Tablets per case &amp; weight per tablet</span>
+            <a href="https://www.google.com/search?q=" id="mcB3NewTab" class="link-btn" target="_blank" rel="noopener">Open in new tab &#8599;</a>
+          </div>
+          <div class="browser-toolbar">
+            <input type="text" id="mcB3Query" class="browser-address" placeholder="Type a product name above to auto-search…">
+            <button class="btn small" id="mcB3Go">Go</button>
+            <button class="btn ghost small" id="mcB3Sync" title="Rebuild this search from the product name field">&#8635; Name</button>
+          </div>
+          <div class="mc-frame-wrap"><iframe id="mcB3Frame" title="Tablet count and weight research" referrerpolicy="no-referrer"></iframe></div>
+        </div>
+
+        <div class="mc-browser" id="mcBrowser4" data-forms="liquid,solid">
+          <div class="mc-browser-head">
+            <span>Research 4 · Dilution — stated as ratio / oz per gal / use %, min &amp; max</span>
+            <a href="https://www.google.com/search?q=" id="mcB4NewTab" class="link-btn" target="_blank" rel="noopener">Open in new tab &#8599;</a>
+          </div>
+          <div class="browser-toolbar">
+            <input type="text" id="mcB4Query" class="browser-address" placeholder="Type a product name above to auto-search…">
+            <button class="btn small" id="mcB4Go">Go</button>
+            <button class="btn ghost small" id="mcB4Sync" title="Rebuild this search from the product name field">&#8635; Name</button>
+          </div>
+          <div class="mc-frame-wrap"><iframe id="mcB4Frame" title="Dilution ratio research" referrerpolicy="no-referrer"></iframe></div>
         </div>
       </div>
     </div>
@@ -1894,6 +2091,301 @@ function avgPct(p){
 }
 
 /* =========================================================
+   MANUAL DILUTION CALCULATOR
+========================================================= */
+let manualResultRec = null;
+
+const MC_LABELS = {
+  ratio: ['Ratio X — min (heavy soil, e.g. 64)', 'Ratio X — max (light soil, optional)'],
+  oz:    ['Oz per gallon — max (heavy soil, e.g. 2)', 'Oz per gallon — min (light soil, optional)'],
+  pct:   ['Use % — max (heavy soil, e.g. 2)', 'Use % — min (light soil, optional)']
+};
+function mcSyncVisibility(){
+  const form = document.getElementById('mcForm').value;
+  const mode = document.getElementById('mcDilMode').value;
+  document.getElementById('mcPackWrap').style.display = form==='solid' ? 'none' : '';
+  document.getElementById('mcSolidWrap').style.display = form==='solid' ? '' : 'none';
+  document.getElementById('mcDilutionWrap').style.display = form==='rtu' ? 'none' : '';
+  document.getElementById('mcRatioConvWrap').style.display = (form!=='rtu' && mode==='ratio') ? '' : 'none';
+  const L = MC_LABELS[mode] || MC_LABELS.ratio;
+  document.getElementById('mcDilMinLabel').textContent = L[0];
+  document.getElementById('mcDilMaxLabel').textContent = L[1];
+}
+document.getElementById('mcForm').addEventListener('change', mcSyncVisibility);
+document.getElementById('mcDilMode').addEventListener('change', mcSyncVisibility);
+
+// Convert whatever the label states into a use-concentration % (concentrate share of total solution).
+function mcToPercent(value, mode, ratioIsTotal){
+  if(value==null || isNaN(value) || value<=0) return null;
+  if(mode==='pct') return value;
+  if(mode==='oz') return value/128*100;             // X oz concentrate in a 128 oz gallon of solution
+  if(mode==='ratio') return ratioIsTotal ? 100/value : 100/(value+1);
+  return null;
+}
+
+document.getElementById('btnManualCalc').addEventListener('click', ()=>{
+  const msg = document.getElementById('mcMsg'); msg.textContent = '';
+  const name = document.getElementById('mcName').value.trim();
+  const price = parseFloat(document.getElementById('mcPrice').value);
+  const form = document.getElementById('mcForm').value;
+  if(isNaN(price) || price<=0){ msg.textContent = 'Enter a case price.'; return; }
+
+  const steps = [];
+  let rec = { price: price, _calc_steps: steps };
+
+  if(form!=='solid'){
+    const count = parseFloat(document.getElementById('mcPackCount').value) || 1;
+    const size = parseFloat(document.getElementById('mcPackSize').value);
+    const unit = document.getElementById('mcPackUnit').value;
+    if(isNaN(size) || size<=0){ msg.textContent = 'Enter the container size.'; return; }
+    const concGal = toGallons(count*size, unit==='oz' ? 'oz' : unit);
+    if(concGal==null){ msg.textContent = 'Could not convert that unit.'; return; }
+    rec.pack_size = `${count} x ${size} ${unit}`;
+    rec.uom = unit;
+    steps.push(`Concentrate volume = ${count} × ${size} ${unit} = ${round(concGal,3)} gal.`);
+
+    if(form==='rtu'){
+      const costPerGal = price/concGal;
+      steps.push(`Ready-to-use — the container volume is the usable volume; no dilution math.`);
+      steps.push(`Cost/gal = $${price.toFixed(2)} ÷ ${round(concGal,3)} gal = $${round(costPerGal,3)}/gal.`);
+      rec.dilution_type = 'Ready To Use — no dilution required';
+      rec.product_form = 'Ready To Use';
+      rec.rtu_yield_gallons = round(concGal,3);
+      rec.rtu_yield_liters = round(concGal/0.264172,3);
+      rec.rtu_cost_per_gallon = round(costPerGal,3);
+      rec.rtu_cost_per_liter = round(costPerGal*0.264172,4);
+    }else{
+      const pcts = mcReadDilution(steps);
+      if(!pcts){ msg.textContent = 'Enter a dilution value.'; return; }
+      const [minPct, maxPct] = pcts;
+      const avgPct = (minPct+maxPct)/2;
+      const yieldAvg = concGal/(avgPct/100);
+      const yieldMin = concGal/(maxPct/100), yieldMax = concGal/(minPct/100);
+      const cost = price/yieldAvg;
+      if(minPct!==maxPct) steps.push(`Average use % = (${round(minPct,4)}% + ${round(maxPct,4)}%) ÷ 2 = ${round(avgPct,4)}%.`);
+      steps.push(`Yield = concentrate volume ÷ (use % ÷ 100) = ${round(concGal,3)} gal ÷ ${round(avgPct/100,5)} = ${round(yieldAvg,2)} gal.`);
+      steps.push(`Cost/gal = $${price.toFixed(2)} ÷ ${round(yieldAvg,2)} gal = $${round(cost,4)}/gal.`);
+      if(minPct!==maxPct) steps.push(`Across the range, yield spans ${round(yieldMin,2)}–${round(yieldMax,2)} gal, so cost/gal spans $${round(price/yieldMax,4)}–$${round(price/yieldMin,4)}.`);
+      rec.dilution_type = 'Percentage dilution';
+      rec.product_form = 'Concentrate';
+      rec.minimum_dilution_percent = round(minPct,4);
+      rec.maximum_dilution_percent = round(maxPct,4);
+      rec.rtu_yield_gallons = round(yieldAvg,2);
+      rec.rtu_yield_liters = round(yieldAvg/0.264172,2);
+      rec.rtu_cost_per_gallon = round(cost,4);
+      rec.rtu_cost_per_liter = round(cost*0.264172,5);
+      rec._rtu_yield_range_gal = [round(yieldMin,2), round(yieldMax,2)];
+      rec._rtu_cost_range_gal = [round(price/yieldMax,4), round(price/yieldMin,4)];
+    }
+  }else{
+    // Solid dose: mass-based (w/w) — same assumptions as the analyzer's tablet branch.
+    const tabCount = parseFloat(document.getElementById('mcTabCount').value);
+    const tabWeight = parseFloat(document.getElementById('mcTabWeight').value);
+    if(isNaN(tabCount) || tabCount<=0){ msg.textContent = 'Enter tablets per case.'; return; }
+    if(isNaN(tabWeight) || tabWeight<=0){ msg.textContent = 'Enter the tablet weight in grams.'; return; }
+    const pcts = mcReadDilution(steps);
+    if(!pcts){ msg.textContent = 'Enter a dilution value.'; return; }
+    const [minPct, maxPct] = pcts;
+    const avgPct = (minPct+maxPct)/2;
+    const GRAMS_PER_GALLON = 3785;
+    const pricePerTablet = price/tabCount;
+    const perTabYield = (tabWeight/(avgPct/100))/GRAMS_PER_GALLON;
+    const caseYield = perTabYield*tabCount;
+    const cost = pricePerTablet/perTabYield;
+    steps.push(`Price per tablet = $${price.toFixed(2)} ÷ ${tabCount} = $${round(pricePerTablet,3)}.`);
+    if(minPct!==maxPct) steps.push(`Average use % = (${round(minPct,4)}% + ${round(maxPct,4)}%) ÷ 2 = ${round(avgPct,4)}%.`);
+    steps.push(`Solution per tablet = ${tabWeight}g ÷ ${round(avgPct/100,5)} = ${round(tabWeight/(avgPct/100),1)}g ≈ ${round(perTabYield,3)} gal (at 3785 g/gal, water density).`);
+    steps.push(`Case yield = ${round(perTabYield,3)} gal × ${tabCount} tablets = ${round(caseYield,1)} gal.`);
+    steps.push(`Cost/gal = $${round(pricePerTablet,3)} ÷ ${round(perTabYield,3)} gal = $${round(cost,4)}/gal.`);
+    steps.push(`Assumes solution density ≈ water and the use % is w/w (tablet mass ÷ solution mass) — treat as an estimate.`);
+    rec.pack_size = `${tabCount} x ${tabWeight}g tablets`;
+    rec.uom = 'tablet';
+    rec.dilution_type = 'Percentage dilution';
+    rec.product_form = 'Tablet';
+    rec.price_per_unit = round(pricePerTablet,3);
+    rec.minimum_dilution_percent = round(minPct,4);
+    rec.maximum_dilution_percent = round(maxPct,4);
+    rec.rtu_yield_gallons = round(caseYield,2);
+    rec.rtu_yield_liters = round(caseYield/0.264172,2);
+    rec.rtu_cost_per_gallon = round(cost,4);
+    rec.rtu_cost_per_liter = round(cost*0.264172,5);
+  }
+
+  rec.product_name = name || null;
+  rec.brand = document.getElementById('mcBrand').value.trim() || null;
+  rec.category = document.getElementById('mcCategory').value.trim() || null;
+  rec.sourced_from = document.getElementById('mcSourcedFrom').value.trim() || null;
+  manualResultRec = rec;
+  mcRenderResult(rec);
+});
+
+// Reads the min/max dilution inputs, converts to use %, returns [minPct, maxPct] or null.
+function mcReadDilution(steps){
+  const mode = document.getElementById('mcDilMode').value;
+  const ratioTotal = document.getElementById('mcRatioTotal').checked;
+  const v1 = parseFloat(document.getElementById('mcDilMin').value);
+  const v2raw = document.getElementById('mcDilMax').value;
+  const v2 = v2raw==='' ? v1 : parseFloat(v2raw);
+  const p1 = mcToPercent(v1, mode, ratioTotal);
+  const p2 = mcToPercent(v2, mode, ratioTotal);
+  if(p1==null && p2==null) return null;
+  let minPct = Math.min(p1??p2, p2??p1), maxPct = Math.max(p1??p2, p2??p1);
+  const modeLabel = mode==='ratio' ? `ratio 1:${v1}${v2!==v1?`–1:${v2}`:''} (${ratioTotal?'X total parts':'X parts water'})`
+    : mode==='oz' ? `${v1}${v2!==v1?`–${v2}`:''} oz per gallon` : `${v1}${v2!==v1?`–${v2}`:''}% use concentration`;
+  steps.push(`Dilution input: ${modeLabel} → use % = ${round(minPct,4)}%${minPct!==maxPct?`–${round(maxPct,4)}%`:''}.`);
+  return [minPct, maxPct];
+}
+
+function mcRenderResult(rec){
+  document.getElementById('mcEmptyState').style.display = 'none';
+  const panel = document.getElementById('mcResultPanel');
+  panel.style.display = '';
+  const body = document.getElementById('mcResultBody');
+  const range = rec._rtu_cost_range_gal;
+  body.innerHTML = `
+    ${rec.product_name ? `<div style="font-weight:700; font-size:14px; margin-bottom:8px;">${esc(rec.product_name)}</div>` : ''}
+    <div class="kv-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:6px 14px;">
+      ${kv('RTU yield (gal)', rec.rtu_yield_gallons)}
+      ${kv('RTU yield (L)', rec.rtu_yield_liters)}
+      ${kv('RTU cost / gal', fmtMoney(rec.rtu_cost_per_gallon))}
+      ${kv('RTU cost / L', fmtMoney(rec.rtu_cost_per_liter))}
+      ${range ? kv('Cost/gal range', `$${range[0]} – $${range[1]}`) : ''}
+      ${rec.price_per_unit!=null ? kv('Price per tablet', fmtMoney(rec.price_per_unit)) : ''}
+    </div>
+    <div style="margin-top:12px;">
+      <label>How this was calculated</label>
+      <ul style="margin:6px 0 0; padding-left:18px; font-size:12.5px; color:var(--ink-soft);">
+        ${(rec._calc_steps||[]).map(s=>`<li style="margin-bottom:4px;">${esc(s)}</li>`).join('')}
+      </ul>
+    </div>`;
+}
+
+document.getElementById('btnManualClear').addEventListener('click', ()=>{
+  ['mcName','mcBrand','mcCategory','mcSourcedFrom','mcPrice','mcPackSize','mcTabCount','mcTabWeight','mcDilMin','mcDilMax']
+    .forEach(id=>{ document.getElementById(id).value=''; });
+  document.getElementById('mcPackCount').value = 1;
+  document.getElementById('mcRatioTotal').checked = false;
+  document.getElementById('mcResultPanel').style.display = 'none';
+  document.getElementById('mcEmptyState').style.display = 'block';
+  document.getElementById('mcMsg').textContent = '';
+  manualResultRec = null;
+});
+
+document.getElementById('btnManualSave').addEventListener('click', ()=>{
+  if(!manualResultRec){ toast('Calculate first.'); return; }
+  if(!manualResultRec.product_name){
+    toast('Add a product name before saving.');
+    document.getElementById('mcName').focus();
+    return;
+  }
+  const rec = {};
+  SCHEMA_FIELDS.forEach(f=>{ rec[f] = manualResultRec[f] !== undefined ? manualResultRec[f] : null; });
+  rec.product_id = makeId(rec.product_name);
+  rec.confidence_score = 85; // research-provided values, deterministic math
+  rec.tags = ['manual entry'];
+  rec.ai_summary = 'Entered via the manual dilution calculator — values researched by the user; RTU math computed locally, no AI extraction.';
+  rec._calc_steps = manualResultRec._calc_steps;
+  rec._rtu_yield_range_gal = manualResultRec._rtu_yield_range_gal;
+  rec._rtu_cost_range_gal = manualResultRec._rtu_cost_range_gal;
+  rec._source_text = `[Manual calculator] price=$${rec.price}, pack=${rec.pack_size}, dilution=${rec.minimum_dilution_percent!=null?rec.minimum_dilution_percent+'%–'+rec.maximum_dilution_percent+'%':'RTU'}`;
+  products.push(rec);
+  saveProducts();
+  refreshDbCount();
+  toast(`Saved "${rec.product_name}" to the database.`);
+});
+
+/* =========================================================
+   MANUAL CALC — research browsers (form-aware, tabbed)
+   Same igu=1 embedded-Google approach as the Analyze mini browser.
+   The right column shows ONE browser at a time via its own tab bar;
+   which tabs are offered depends on the selected product form:
+     always      → 1. product form question
+     liquid/rtu  → 2. pack size (concentrate volume)
+     solid       → 3. tablets per case & weight per tablet
+     liquid/solid→ 4. dilution stated as / ratio min (heavy soil) & max (light soil)
+   Each auto-fills from the product name (debounced) until hand-edited;
+   an iframe only loads its query once its tab is actually shown.
+========================================================= */
+(function(){
+  const nameInput = document.getElementById('mcName');
+  const formSelect = document.getElementById('mcForm');
+  const tabBar = document.getElementById('mcBrowserTabs');
+  let activeB = 1;
+
+  function gUrl(q, embedded){
+    return 'https://www.google.com/search?' + (embedded?'igu=1&':'') + 'q=' + encodeURIComponent(q);
+  }
+
+  const CONFIGS = [
+    { n:1, queryFor: name => `${name}, is this liquid concentrate, ready to use (no dilution), or solid dose (tablet/block/capsule)?` },
+    { n:2, queryFor: name => `${name}, what's the pack size (concentrate volume)?` },
+    { n:3, queryFor: name => `${name}, how many tablets/units per case and what is the weight per tablet in grams?` },
+    { n:4, queryFor: name => `${name}, dilution stated as ratio 1:X, oz per gallon, or use % — min (heavy soil) and max (light soil)?` }
+  ];
+
+  const browsers = CONFIGS.map(cfg=>{
+    const panel = document.getElementById('mcBrowser'+cfg.n);
+    const frame = document.getElementById('mcB'+cfg.n+'Frame');
+    const input = document.getElementById('mcB'+cfg.n+'Query');
+    const newTab = document.getElementById('mcB'+cfg.n+'NewTab');
+    const b = { n:cfg.n, panel, frame, input, dirty:false, pendingQ:null,
+      forms: (panel.dataset.forms||'').split(',') };
+    b.applicable = ()=> b.forms.includes(formSelect.value);
+    b.shown = ()=> b.applicable() && activeB===b.n;
+    function run(q){
+      q = String(q||'').trim();
+      if(!q) return;
+      input.value = q;
+      newTab.href = gUrl(q, false);
+      if(b.shown()){ frame.src = gUrl(q, true); b.pendingQ = null; }
+      else{ b.pendingQ = q; } // load when this tab is next shown
+    }
+    b.autoFill = function(){
+      const name = nameInput.value.trim();
+      if(!name) return;
+      b.dirty = false;
+      run(cfg.queryFor(name));
+    };
+    b.loadPending = function(){
+      if(b.shown() && b.pendingQ){ frame.src = gUrl(b.pendingQ, true); b.pendingQ = null; }
+    };
+    input.addEventListener('input', ()=>{ b.dirty = true; });
+    input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); b.dirty = true; run(input.value); } });
+    document.getElementById('mcB'+cfg.n+'Go').addEventListener('click', ()=>{ b.dirty = true; run(input.value); });
+    document.getElementById('mcB'+cfg.n+'Sync').addEventListener('click', b.autoFill);
+    return b;
+  });
+
+  function refreshBrowserUI(){
+    // If the active tab no longer applies to this form, fall back to the first applicable one.
+    const active = browsers.find(b=>b.n===activeB);
+    if(!active || !active.applicable()){
+      const first = browsers.find(b=>b.applicable());
+      activeB = first ? first.n : 1;
+    }
+    browsers.forEach(b=>{
+      const btn = tabBar.querySelector(`button[data-b="${b.n}"]`);
+      btn.style.display = b.applicable() ? '' : 'none';
+      btn.classList.toggle('active', b.n===activeB);
+      b.panel.style.display = b.shown() ? '' : 'none';
+      b.loadPending();
+    });
+  }
+
+  tabBar.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ activeB = parseInt(btn.dataset.b, 10); refreshBrowserUI(); });
+  });
+  formSelect.addEventListener('change', refreshBrowserUI);
+  refreshBrowserUI();
+
+  let deb = null;
+  nameInput.addEventListener('input', ()=>{
+    clearTimeout(deb);
+    deb = setTimeout(()=>{ browsers.forEach(b=>{ if(!b.dirty) b.autoFill(); }); }, 700);
+  });
+})();
+
+/* =========================================================
    SHEET (crosswalk of selected match pairs)
 ========================================================= */
 const LS_KEY_SHEET = 'cpie_sheet';
@@ -1922,7 +2414,7 @@ function brandMfr(p){
   if(b && m && b.toLowerCase()!==m.toLowerCase()) return b + ' / ' + m;
   return b || m || '\u2014';
 }
-function fmtMoney(v, dp){ const n = parseFloat(v); return isNaN(n) ? '\u2014' : '$' + n.toFixed(dp); }
+function sheetMoney(v, dp){ const n = parseFloat(v); return isNaN(n) ? '\u2014' : '$' + n.toFixed(dp); }
 function sheetSavings(a, b){
   const ra = parseFloat(a.rtu_cost_per_gallon), rb = parseFloat(b.rtu_cost_per_gallon);
   if(isNaN(ra) || isNaN(rb) || ra<=0 || rb<=0) return null;
@@ -1956,14 +2448,14 @@ function renderSheet(){
       <td>${esc(a.sourced_from)||'\u2014'}</td>
       <td>${esc(a.category)||'\u2014'}</td>
       <td>${esc(a.pack_size)||'\u2014'}</td>
-      <td class="num">${fmtMoney(a.price,2)}</td>
-      <td class="num">${fmtMoney(a.rtu_cost_per_gallon,3)}</td>
+      <td class="num">${sheetMoney(a.price,2)}</td>
+      <td class="num">${sheetMoney(a.rtu_cost_per_gallon,3)}</td>
       <td><div class="prod-name">${esc(b.product_name)||b.product_id}</div></td>
       <td><div class="prod-sub">${esc(brandMfr(b))}</div></td>
       <td>${esc(b.sourced_from)||'\u2014'}</td>
       <td>${esc(b.pack_size)||'\u2014'}</td>
-      <td class="num">${fmtMoney(b.price,2)}</td>
-      <td class="num">${fmtMoney(b.rtu_cost_per_gallon,3)}</td>
+      <td class="num">${sheetMoney(b.price,2)}</td>
+      <td class="num">${sheetMoney(b.rtu_cost_per_gallon,3)}</td>
       <td class="num"><span class="pill ${tierC}">${r.score}%</span></td>
       <td class="num" ${svClass}>${svGal}</td>
       <td class="num" ${svClass}>${svPct}</td>
@@ -2223,6 +2715,7 @@ document.getElementById('btnExportSheetXlsx').addEventListener('click', async ()
 refreshKeyStatus();
 refreshDbCount();
 refreshSheetCount();
+mcSyncVisibility();
 renderDatabase();
 </script>
 </body>
